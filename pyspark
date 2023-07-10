@@ -40,7 +40,7 @@ result_df = joined_df.groupBy("prod_id", "prod_name").agg(min("sale_time").alias
 final_df = result_df.join(joined_df, ["prod_id", "prod_name", "oldest_date", "least_price"], "inner")
 
 # Select the required columns
-final_df.select("prod_id", "prod_name").show(truncate=False)
+final_df.select("prod_id", "prod_name").write.mode("overwrite").csv("results.csv", header=True)
 
 # Stop the Spark session
 spark.stop()
