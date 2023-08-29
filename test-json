@@ -1,0 +1,36 @@
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.col
+
+object CSVWriteExample {
+  def main(args: Array[String]): Unit = {
+    // Initialize Spark session
+    val spark = SparkSession.builder()
+      .appName("CSVWrite")
+      .getOrCreate()
+
+    // Sample DataFrame with StructType column
+    val data = Seq(
+      (1, ("123 Main St", "CityA", "12345")),
+      (2, ("456 Elm St", "CityB", "67890"))
+    )
+    val columns = Seq("id", "address")
+    val df = spark.createDataFrame(data).toDF(columns: _*)
+
+    // Flatten the StructType column
+    val flattened_df = df.select(
+      col("id"),
+      col("address.street").alias("street"),
+      col("address.city").alias("city"),
+      col("address.zip").alias("zip")
+    )
+
+    // Write flattened DataFrame to CSV
+    flattened_df.write
+      .mode("overwrite")
+      .option("header", "true")
+      .csv("flattened_data.csv")
+
+    // Stop Spark session
+    spark.stop()
+  }
+}
