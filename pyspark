@@ -219,3 +219,42 @@ val structTypeColumns = str.split("\\|").flatMap { operation =>
 val finalDF = resultDF.select(columns.map(col) ++ structTypeColumns: _*)
 
 finalDF.show()
+
+
+import org.apache.spark.sql.{SparkSession, DataFrame}
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
+
+val spark = SparkSession.builder().appName("YourAppName").getOrCreate()
+
+// Create a sample DataFrame with 7 columns and 3 rows
+val data = Seq(
+  (1, 10, 5, 20, 15, 7, 25),
+  (2, 15, 8, 18, 12, 9, 30),
+  (3, 20, 3, 22, 14, 11, 35)
+)
+
+val columns = Seq("col1", "col2", "col3", "col4", "col5", "col6", "col7")
+val df = spark.createDataFrame(data).toDF(columns: _*)
+
+// Specify a string with 4 columns for demonstration
+val str = "sum(col1)|min(col2)|max(col3)|avg(col4)"
+
+// Apply operations and add columns to the DataFrame
+val resultDF = str.split("\\|").foldLeft(df) { (tempDF, operation) =>
+  val colName = substring_index(substring_index(operation, "(", -1), ")", 1)
+  val op = substring_index(operation, "(", 1)
+
+  tempDF.withColumn(colName, expr(s"$op($colName)").cast(DoubleType))
+}
+
+// Create struct type columns only for the specified ones
+val structTypeColumns = str.split("\\|").flatMap { operation =>
+  val colName = substring_index(substring_index(operation, "(", -1), ")", 1)
+  Some(col(colName).cast(DoubleType).alias(colName))
+}
+
+val finalDF = resultDF.select(columns.map(col) ++ structTypeColumns: _*)
+
+finalDF.show()
+
