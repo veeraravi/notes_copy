@@ -29,3 +29,13 @@ val result = resdf.withColumn("datacontrols", dataControls)
 
 // Show the result
 result.show()
+
+// Convert result DataFrame to JSON and assign to a variable
+val jsonResult: String = result.toJSON.collect().mkString("[", ",", "]")
+
+// Print or use the jsonResult variable as needed
+println(jsonResult)
+
+
+
+
