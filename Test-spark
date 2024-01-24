@@ -36,6 +36,7 @@ val jsonResult: String = result.toJSON.collect().mkString("[", ",", "]")
 // Print or use the jsonResult variable as needed
 println(jsonResult)
 
+val resdf: DataFrame = spark.sql(s"SELECT ${aggregations.map(expr => s"${expr.sql} as ${expr.prettyName}").mkString(", ")} FROM tbl1")
 
 
 
