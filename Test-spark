@@ -1,0 +1,31 @@
+import org.apache.spark.sql.{SparkSession, DataFrame}
+import org.apache.spark.sql.functions._
+
+// Create Spark session
+val spark = SparkSession.builder.appName("DataFrameOperations").getOrCreate()
+
+// Create a DataFrame with 5 columns and 5 rows
+val data = Seq(
+  (1, 10, 20, 30, 40),
+  (2, 15, 25, 35, 45),
+  (3, 20, 30, 40, 50),
+  (4, 25, 35, 45, 55),
+  (5, 30, 40, 50, 60)
+)
+
+val df = spark.createDataFrame(data).toDF("col1", "col2", "col3", "col4", "col5")
+
+// Split the string and create a temporary view
+val str = "sum(col1)|min(col2)|max(col3)"
+val aggregations = str.split("\\|").map(expr)
+df.createOrReplaceTempView("tbl1")
+
+// Execute SQL query and create a new DataFrame
+val resdf: DataFrame = spark.sql(s"SELECT ${aggregations.mkString(", ")} FROM tbl1")
+
+// Create a new column with structtype
+val dataControls = struct(resdf.columns.map(col): _*)
+val result = resdf.withColumn("datacontrols", dataControls)
+
+// Show the result
+result.show()
