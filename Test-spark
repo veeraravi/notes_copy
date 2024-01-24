@@ -39,4 +39,37 @@ println(jsonResult)
 val resdf: DataFrame = spark.sql(s"SELECT ${aggregations.map(expr => s"${expr.sql} as ${expr.prettyName}").mkString(", ")} FROM tbl1")
 
 
+import org.apache.spark.sql.{SparkSession, DataFrame}
+import org.apache.spark.sql.functions._
+
+// Assuming you already have a SparkSession named 'spark'
+val spark = SparkSession.builder.appName("DataFrameOperations").getOrCreate()
+
+// Create a DataFrame with 5 columns and 5 rows
+val data = Seq(
+  (1, 10, 20, 30, 40),
+  (2, 15, 25, 35, 45),
+  (3, 20, 30, 40, 50),
+  (4, 25, 35, 45, 55),
+  (5, 30, 40, 50, 60)
+)
+
+val df = spark.createDataFrame(data).toDF("col1", "col2", "col3", "col4", "col5")
+
+// Split the string and create a temporary view
+val str = "sum(col1)|min(col2)|max(col3)"
+val aggregations = str.split("\\|").map(expr)
+
+// Create temporary view
+df.createOrReplaceTempView("tbl1")
+
+// Construct select expressions dynamically with aliasing
+val selectExpressions = aggregations.zipWithIndex.map { case (expr, index) => s"${expr.sql} as col${index + 1}" }
+val selectClause = selectExpressions.mkString(", ")
+
+// Execute SQL query and create a new DataFrame
+val resdf: DataFrame = spark.sql(s"SELECT $selectClause FROM tbl1")
+
+// Show the result
+resdf.show()
 
