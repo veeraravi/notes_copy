@@ -101,3 +101,31 @@ val dfWithJsonStruct = df.withColumn("json_struct", from_json(col("json_data"), 
 // Show the resulting DataFrame
 dfWithJsonStruct.show(truncate = false)
 
+
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
+
+// Create a Spark session
+val spark = SparkSession.builder().appName("DynamicStructType").master("local").getOrCreate()
+
+// Sample DataFrame with a JSON string
+val jsonData = """{"sum(col1)":6,"min(col2)":10,"max(col3)":100}"""
+
+// Parse JSON string to extract column names and types
+val jsonMap = spark.read.json(Seq(jsonData).toDS).collect()(0).getValuesMap[String]
+
+// Create StructType dynamically
+val dynamicSchema = StructType(jsonMap.map { case (columnName, dataType) =>
+  StructField(columnName, dataType match {
+    case "bigint" => LongType
+    case "double" => DoubleType
+    case _ => StringType  // Default to StringType for unknown types
+  }, nullable = true)
+}.toSeq)
+
+// Print the dynamically created schema
+println("Dynamically Created StructType:")
+dynamicSchema.printTreeString()
+
+// Now you can use this dynamicSchema for your DataFrame
