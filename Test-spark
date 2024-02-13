@@ -129,3 +129,48 @@ println("Dynamically Created StructType:")
 dynamicSchema.printTreeString()
 
 // Now you can use this dynamicSchema for your DataFrame
+------------------------------------------------------------
+
+
+import org.apache.spark.sql.{SparkSession, DataFrame}
+import org.apache.spark.sql.functions._
+
+// Assuming caseclass1 and caseclass2 are defined as case classes
+case class CaseClass1(a: Int, b: Int, c: Int)
+case class CaseClass2(x: Int, y: Int, z: Int)
+
+val spark = SparkSession.builder().appName("Example").getOrCreate()
+
+val a = 1 // Assuming 'a' is defined
+
+val msg: Array[Any] = (a == 1) match {
+  case true => Array(CaseClass1(1, 2, 3))
+  case false => Array(CaseClass2(2, 3, 4))
+}
+
+// Assuming you want to convert the array to a DataFrame
+val df: DataFrame = spark.createDataFrame(msg)
+
+df.show()
+============================================================
+
+import org.apache.spark.sql.{SparkSession, DataFrame}
+import org.apache.spark.sql.functions._
+
+// Assuming caseclass1 and caseclass2 are defined as case classes
+case class CaseClass1(a: Int, b: Int, c: Int)
+case class CaseClass2(x: Int, y: Int, z: Int)
+
+val spark = SparkSession.builder().appName("Example").getOrCreate()
+
+val a = 1 // Assuming 'a' is defined
+
+val msg = (a == 1) match {
+  case true => Seq(CaseClass1(1, 2, 3))
+  case false => Seq(CaseClass2(2, 3, 4))
+}
+
+// Use the createDataFrame method with Encoders.product
+val df: DataFrame = spark.createDataFrame(msg)
+
+df.show()
