@@ -257,4 +257,65 @@ val structTypeColumns = str.split("\\|").flatMap { operation =>
 val finalDF = resultDF.select(columns.map(col) ++ structTypeColumns: _*)
 
 finalDF.show()
+--------------------------------
+
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, udf
+from pyspark.sql.types import StructType, StructField, StringType, ArrayType
+
+# Create a Spark session
+spark = SparkSession.builder.appName("JsonDataProcessing").getOrCreate()
+
+# Sample DataFrame with CSV data
+data = [(1, "mydata", "<p> {'MegaAttributes': {'lastUpdateUser': 'gessner.tc', 'lastUpdateTimestamp': '2023-09-04 13:16:10.790963', 'renderAsTable': 'false', 'attributes': [], 'tableTitle': 'MegaAttributes'}, 'SourceArticleAttributes': {'lastUpdateUser': 'gessner.tc', 'lastUpdateTimestamp': '2023-09-04 13:16:10.790963', 'renderAsTable': 'false', 'attributes': [('key', 'sourceArticleID', 'value', 1295, 'Availability'), ('key', 'sourceArticleName', 'value', 'eBusiness Analytics - online'), ('key', 'sourceArticleParentID', 'value', ''), ('key', 'sourceArticleTemplateID', 'value', [70]), ('key', 'sourceArticleTemplateName', 'value', ['Data Signals MIn'])]}}}</p>",)]
+
+columns = ["id", "name", "json_data"]
+df = spark.createDataFrame(data, columns)
+
+# Function to remove HTML tags using regular expression
+def remove_html_tags(json_with_html):
+    return re.sub(r'<.*?>', '', json_with_html)
+
+# Register the UDF
+remove_html_tags_udf = udf(remove_html_tags, StringType())
+
+# Apply the UDF to the 'json_data' column to remove HTML tags
+df = df.withColumn('json_data', remove_html_tags_udf(col('json_data')))
+
+# Define the custom PySpark schema for the 'json_data' column
+custom_schema = StructType([
+    StructField("MegaAttributes", StructType([
+        StructField("lastUpdateUser", StringType(), True),
+        StructField("lastUpdateTimestamp", StringType(), True),
+        StructField("renderAsTable", StringType(), True),
+        StructField("attributes", ArrayType(StructType([])), True),
+        StructField("tableTitle", StringType(), True)
+    ]), True),
+    
+    StructField("SourceArticleAttributes", StructType([
+        StructField("lastUpdateUser", StringType(), True),
+        StructField("lastUpdateTimestamp", StringType(), True),
+        StructField("renderAsTable", StringType(), True),
+        StructField("attributes", ArrayType(StructType([
+            StructField("key", StringType(), True),
+            StructField("value", StringType(), True)
+        ])), True),
+        StructField("tableTitle", StringType(), True)
+    ]), True)
+])
+
+# Convert the 'json_data' column to JSON type using the defined schema
+df = df.withColumn('json_data', from_json(col('json_data'), custom_schema))
+
+# Display the resulting DataFrame
+df.show(truncate=False)
+
+
+
+
+
+
+
+
+
 
