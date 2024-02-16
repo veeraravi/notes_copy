@@ -261,20 +261,25 @@ finalDF.show()
 
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, udf
-from pyspark.sql.types import StructType, StructField, StringType, ArrayType
+from pyspark.sql.types import StructType, StructField, StringType, ArrayType, IntegerType
+import json
+import re
 
 # Create a Spark session
 spark = SparkSession.builder.appName("JsonDataProcessing").getOrCreate()
 
-# Sample DataFrame with CSV data
-data = [(1, "mydata", "<p> {'MegaAttributes': {'lastUpdateUser': 'gessner.tc', 'lastUpdateTimestamp': '2023-09-04 13:16:10.790963', 'renderAsTable': 'false', 'attributes': [], 'tableTitle': 'MegaAttributes'}, 'SourceArticleAttributes': {'lastUpdateUser': 'gessner.tc', 'lastUpdateTimestamp': '2023-09-04 13:16:10.790963', 'renderAsTable': 'false', 'attributes': [('key', 'sourceArticleID', 'value', 1295, 'Availability'), ('key', 'sourceArticleName', 'value', 'eBusiness Analytics - online'), ('key', 'sourceArticleParentID', 'value', ''), ('key', 'sourceArticleTemplateID', 'value', [70]), ('key', 'sourceArticleTemplateName', 'value', ['Data Signals MIn'])]}}}</p>",)]
+# Sample DataFrame
+data = [(1, 'mydata', "<p>{'MegaAttributes': {'lastUpdateUser': 'gessner.tc', 'lastUpdateTimestamp': '2023-09-04 13: 16:10.790963', 'renderAsTable': 'false', 'tableTitle': 'MegaAttributes', 'attributes': []}, 'SourceArticleAttributes':{'lastUpdateUser': 'gessner.tc','lastUpdateTimestamp': '2023-09-04 13: 16:10.790963', 'renderAsTable': 'false', 'attributes': [{'key': 'sourceArticleID', 'value': 1295}, {'key': 'sourceArticleName', 'value': 'eBusiness Analytics - online Availability'}, {'key': 'sourceArticleParentID', 'value': ''}, {'key': 'sourceArticleTemplateID', 'value': [70]}, {'key': 'sourceArticleTemplateName', 'value': ['Data Signals In’]}]}}</p>"),]
 
-columns = ["id", "name", "json_data"]
+columns = ['id', 'name', 'json_data']
 df = spark.createDataFrame(data, columns)
+
+# Define a regular expression pattern to identify HTML tags
+html_pattern = re.compile(r'<.*?>')
 
 # Function to remove HTML tags using regular expression
 def remove_html_tags(json_with_html):
-    return re.sub(r'<.*?>', '', json_with_html)
+    return re.sub(html_pattern, '', json_with_html)
 
 # Register the UDF
 remove_html_tags_udf = udf(remove_html_tags, StringType())
@@ -282,14 +287,14 @@ remove_html_tags_udf = udf(remove_html_tags, StringType())
 # Apply the UDF to the 'json_data' column to remove HTML tags
 df = df.withColumn('json_data', remove_html_tags_udf(col('json_data')))
 
-# Define the custom PySpark schema for the 'json_data' column
-custom_schema = StructType([
+# Define the JSON schema for the 'json_data' column
+json_schema = StructType([
     StructField("MegaAttributes", StructType([
         StructField("lastUpdateUser", StringType(), True),
         StructField("lastUpdateTimestamp", StringType(), True),
         StructField("renderAsTable", StringType(), True),
+        StructField("tableTitle", StringType(), True),
         StructField("attributes", ArrayType(StructType([])), True),
-        StructField("tableTitle", StringType(), True)
     ]), True),
     
     StructField("SourceArticleAttributes", StructType([
@@ -300,15 +305,15 @@ custom_schema = StructType([
             StructField("key", StringType(), True),
             StructField("value", StringType(), True)
         ])), True),
-        StructField("tableTitle", StringType(), True)
     ]), True)
 ])
 
-# Convert the 'json_data' column to JSON type using the defined schema
-df = df.withColumn('json_data', from_json(col('json_data'), custom_schema))
+# Convert the 'json_data' column to JSON type
+df = df.withColumn('json_data', from_json(col('json_data'), json_schema))
 
 # Display the resulting DataFrame
 df.show(truncate=False)
+
 
 
 
