@@ -174,3 +174,19 @@ val msg = (a == 1) match {
 val df: DataFrame = spark.createDataFrame(msg)
 
 df.show()
+
+
+    val xmlString ="""<employees><employee><id>1</id><name>John Doe</name><dept>IT</dept><salary>50000</salary></employee><employee><id>2</id><name>Jane Smith</name><dept>HR</dept><salary>55000</salary></employee><employee><id>3</id><name>Bob Johnson</name><dept>Finance</dept><salary>60000</salary></employee></employees>"""
+
+
+    val modifiedString = xmlString.split("</employee>")
+    var res = modifiedString
+      .zipWithIndex
+      .map { case (part, index) =>
+        if (index == modifiedString.length - 1) part else part + """<company>bigdatasolutions</company><city>banaglore</city>"""
+      }
+      .mkString("</employee>")
+
+    println(res)
+
+
