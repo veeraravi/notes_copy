@@ -400,4 +400,78 @@ class KafkaMsgTest extends AnyFunSuite with Matchers {
     result shouldBe ""
   }
 }
+======================================================
+
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
+import org.mockito.Mockito._
+import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.slf4j.Logger
+
+class ParseXMLMessageTest extends AnyFunSuite with Matchers {
+
+  // Mocking logger
+  val logger: Logger = mock(classOf[Logger])
+
+  // Test for parseXMLMessage with a valid message
+  test("parseXMLMessage should return valid XML message with Kafka details") {
+    // Arrange
+    val mockMessage = mock(classOf[ConsumerRecord[String, String]])
+    val topicName = "test-topic"
+    val partition = 1
+    val offset = 123L
+    val currTimestamp = 1633022820000L
+    val rowTag = "row"
+    val messageValue = """<root><row>data</row></root>"""
+
+    // Mocking the Kafka message
+    when(mockMessage.topic()).thenReturn(topicName)
+    when(mockMessage.partition()).thenReturn(partition)
+    when(mockMessage.offset()).thenReturn(offset)
+    when(mockMessage.timestamp()).thenReturn(currTimestamp)
+    when(mockMessage.value()).thenReturn(messageValue)
+
+    // Act
+    val result = parseXMLMessage(mockMessage, rowTag, isKafkaHeaderRequired = true)
+
+    // Assert
+    result shouldBe """<root><row>data</row></root><Kafka_topic>test-topic</Kafka_topic><Kafka_offset>123</Kafka_offset><Kafka_partitionId>1</Kafka_partitionId><Kafka_CreateTime>1633022820000</Kafka_CreateTime></row>"""
+  }
+
+  // Test for parseXMLMessage with null message
+  test("parseXMLMessage should return an empty string when message is null") {
+    // Act
+    val result = parseXMLMessage(null, "row", isKafkaHeaderRequired = true)
+
+    // Assert
+    result shouldBe ""
+  }
+
+  // Test for parseXMLMessage with an empty or malformed XML message
+  test("parseXMLMessage should return empty string when the message does not contain the row tag") {
+    // Arrange
+    val mockMessage = mock(classOf[ConsumerRecord[String, String]])
+    val topicName = "test-topic"
+    val partition = 1
+    val offset = 123L
+    val currTimestamp = 1633022820000L
+    val rowTag = "row"
+    val messageValue = """<root><data>no-row-tag</data></root>"""
+
+    // Mocking the Kafka message
+    when(mockMessage.topic()).thenReturn(topicName)
+    when(mockMessage.partition()).thenReturn(partition)
+    when(mockMessage.offset()).thenReturn(offset)
+    when(mockMessage.timestamp()).thenReturn(currTimestamp)
+    when(mockMessage.value()).thenReturn(messageValue)
+
+    // Act
+    val result = parseXMLMessage(mockMessage, rowTag, isKafkaHeaderRequired = true)
+
+    // Assert
+    result shouldBe """<root><data>no-row-tag</data></root><Kafka_topic>test-topic</Kafka_topic><Kafka_offset>123</Kafka_offset><Kafka_partitionId>1</Kafka_partitionId><Kafka_CreateTime>1633022820000</Kafka_CreateTime></row>"""
+  }
+}
+
+
 
