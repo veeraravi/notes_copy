@@ -147,4 +147,72 @@ class AvroMessageProcessingTest extends AnyFunSuite with Matchers {
   }
 }
 
+--------------------------------------------------------
+
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
+import org.mockito.Mockito._
+import org.mockito.ArgumentMatchers._
+import org.apache.kafka.clients.consumer.KafkaConsumer
+import org.apache.kafka.clients.consumer.OffsetAndMetadata
+import org.apache.kafka.common.TopicPartition
+import java.util
+import scala.collection.JavaConverters._
+import org.slf4j.Logger
+import org.mockito.Mockito.{mock, verify}
+
+class KafkaUtilsTest extends AnyFunSuite with Matchers {
+
+  // Mocking logger
+  val logger: Logger = mock(classOf[Logger])
+
+  test("CommittedoOffset should commit offsets correctly") {
+    // Arrange
+    val mockConsumer = mock(classOf[KafkaConsumer[String, String]])
+    val topicName = "test-topic"
+    val partition = 0
+    val offset = 100L
+
+    // Mock KafkaConsumer behavior
+    val mockPartitionAndOffset = mock(classOf[util.HashMap[TopicPartition, OffsetAndMetadata]])
+    
+    // Act
+    CommittedoOffset(mockConsumer, topicName, partition, offset)
+
+    // Assert
+    val topicPartition = new TopicPartition(topicName, partition)
+    val offsetAndMetadata = new OffsetAndMetadata(offset)
+    
+    // Verify that commitSync was called with the right arguments
+    verify(mockConsumer).commitSync(argThat { map: util.Map[TopicPartition, OffsetAndMetadata] =>
+      map.size() == 1 && map.containsKey(topicPartition) && map.get(topicPartition) == offsetAndMetadata
+    })
+  }
+
+  test("getValueFromPropertyFileOrDefault should return value from property file when present") {
+    // Arrange
+    val propertyFileMap = Map("key1" -> "value1", "key2" -> "value2")
+    val consumerConfigKey = "consumer-key"
+    val mockConsumerDefaultValues = mock(classOf[Map[String, String]])
+    
+    // Act
+    val result = getValueFromPropertyFileOrDefault(propertyFileMap, "key1", consumerConfigKey)
+
+    // Assert
+    result shouldBe "value1"
+  }
+
+  test("getValueFromPropertyFileOrDefault should return default value when key is missing or empty") {
+    // Arrange
+    val propertyFileMap = Map("key1" -> "value1")
+    val consumerConfigKey = "consumer-key"
+    val mockConsumerDefaultValues = Map("consumer-key" -> "default-value")
+
+    // Act
+    val result = getValueFromPropertyFileOrDefault(propertyFileMap, "missingKey", consumerConfigKey)
+
+    // Assert
+    result shouldBe "default-value"
+  }
+}
 
