@@ -216,3 +216,59 @@ class KafkaUtilsTest extends AnyFunSuite with Matchers {
   }
 }
 
+=====================================
+
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
+import org.mockito.Mockito._
+import org.mockito.ArgumentMatchers._
+import org.apache.spark.streaming.kafka010.OffsetRange
+import org.apache.kafka.clients.consumer.KafkaConsumer
+import org.mockito.MockitoAnnotations
+import org.slf4j.Logger
+
+class OffsetUpdateTest extends AnyFunSuite with Matchers {
+
+  // Mocking logger
+  val logger: Logger = mock(classOf[Logger])
+
+  // Mocking KafkaConsumer
+  val consumer: KafkaConsumer[String, String] = mock(classOf[KafkaConsumer[String, String]])
+
+  // Mocking OffsetRange
+  val offsetRange1: OffsetRange = OffsetRange("test-topic-1", 0, 0L, 100L)
+  val offsetRange2: OffsetRange = OffsetRange("test-topic-2", 1, 0L, 200L)
+  val offsetRanges: Array[OffsetRange] = Array(offsetRange1, offsetRange2)
+
+  // Mocking the CommittedOffset method
+  def CommittedOffset(consumer: KafkaConsumer[String, String], topic: String, partition: Int, offset: Long): Unit = {
+    // CommittedOffset mock implementation
+  }
+
+  // The method we are testing
+  def updateOffset(): Unit = {
+    logger.info("Committing the Offset to Kafka - Started")
+    offsetRanges.foreach { offsetRange =>
+      CommittedOffset(consumer, offsetRange.topic, offsetRange.partition, offsetRange.untilOffset)
+    }
+    logger.info("Committing the Offset to Kafka Completed")
+    logger.info("Updating the email body with kafka topic details")
+  }
+
+  test("updateOffset should commit offsets correctly and log messages") {
+    // Arrange
+    // Mock CommittedOffset method
+    val mockCommittedOffset = mock(classOf[CommittedOffset])
+    
+    // Act
+    updateOffset()
+
+    // Assert
+    verify(logger).info("Committing the Offset to Kafka - Started")
+    verify(mockCommittedOffset).apply(consumer, "test-topic-1", 0, 100L)
+    verify(mockCommittedOffset).apply(consumer, "test-topic-2", 1, 200L)
+    verify(logger).info("Committing the Offset to Kafka Completed")
+    verify(logger).info("Updating the email body with kafka topic details")
+  }
+}
+
