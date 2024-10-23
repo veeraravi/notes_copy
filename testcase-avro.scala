@@ -313,4 +313,91 @@ class OffsetCommitterTest extends AnyFunSuite with Matchers {
     verify(logger).info("Updating the email body with kafka topic details")
   }
 }
+=========================================================
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
+import org.mockito.Mockito._
+import org.mockito.ArgumentMatchers._
+import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.kafka.common.header.Headers
+import org.apache.kafka.common.header.internals.RecordHeaders
+import org.slf4j.Logger
+import scala.collection.JavaConverters._
+
+class KafkaMsgTest extends AnyFunSuite with Matchers {
+
+  // Mocking logger
+  val logger: Logger = mock(classOf[Logger])
+
+  // Mocking HeaderjsonUtil function
+  def HeaderjsonUtil(headersJson: String): String = {
+    "," + headersJson
+  }
+
+  // Test for prepareKafkaMsg when headers are required
+  test("prepareKafkaMsg should return valid message with headers when isKafkaHeaderRequired is true") {
+    // Arrange
+    val mockMessage = mock(classOf[ConsumerRecord[String, String]])
+    val topicName = "test-topic"
+    val partition = 0
+    val offset = 100L
+    val currTimestamp = 1633022820000L // Mock timestamp
+    val messageValue = """{"field": "value"}"""
+    
+    // Mocking the Kafka message
+    when(mockMessage.topic()).thenReturn(topicName)
+    when(mockMessage.partition()).thenReturn(partition)
+    when(mockMessage.offset()).thenReturn(offset)
+    when(mockMessage.timestamp()).thenReturn(currTimestamp)
+    when(mockMessage.value()).thenReturn(messageValue)
+
+    // Mock Kafka headers
+    val headers = new RecordHeaders()
+    headers.add("headerKey", "headerValue".getBytes("UTF-8"))
+    when(mockMessage.headers()).thenReturn(headers)
+
+    // Act
+    val result = prepareKafkaMsg(mockMessage, "Y", isKafkaHeaderRequired = true)
+
+    // Assert
+    result shouldBe """{"field": "value", "Kafka_topic":"test-topic","Kafka_offset":100,"Kafka_partitionId":0,"Kafka_CreateTime":1633022820000,"Kafka_header":{"headerKey":"headerValue"}, "Json":""{"field": "value"}"""
+  }
+
+  // Test for prepareKafkaMsg when headers are not required
+  test("prepareKafkaMsg should return valid message without headers when isKafkaHeaderRequired is false") {
+    // Arrange
+    val mockMessage = mock(classOf[ConsumerRecord[String, String]])
+    val topicName = "test-topic"
+    val partition = 0
+    val offset = 100L
+    val currTimestamp = 1633022820000L // Mock timestamp
+    val messageValue = """{"field": "value"}"""
+    
+    // Mocking the Kafka message
+    when(mockMessage.topic()).thenReturn(topicName)
+    when(mockMessage.partition()).thenReturn(partition)
+    when(mockMessage.offset()).thenReturn(offset)
+    when(mockMessage.timestamp()).thenReturn(currTimestamp)
+    when(mockMessage.value()).thenReturn(messageValue)
+
+    // Mock Kafka headers (not needed in this case)
+    val headers = new RecordHeaders()
+    when(mockMessage.headers()).thenReturn(headers)
+
+    // Act
+    val result = prepareKafkaMsg(mockMessage, "Y", isKafkaHeaderRequired = false)
+
+    // Assert
+    result shouldBe """{"field": "value", "Kafka_topic":"test-topic","Kafka_offset":100,"Kafka_partitionId":0,"Kafka_CreateTime":1633022820000, "Json":""{"field": "value"}"""
+  }
+
+  // Test for prepareKafkaMsg when message is null
+  test("prepareKafkaMsg should return an empty string when the message is null") {
+    // Act
+    val result = prepareKafkaMsg(null, "Y", isKafkaHeaderRequired = true)
+
+    // Assert
+    result shouldBe ""
+  }
+}
 
