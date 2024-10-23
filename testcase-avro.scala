@@ -271,4 +271,46 @@ class OffsetUpdateTest extends AnyFunSuite with Matchers {
     verify(logger).info("Updating the email body with kafka topic details")
   }
 }
+------------------------------------------------------------------------------
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
+import org.mockito.Mockito._
+import org.mockito.ArgumentMatchers._
+import org.apache.spark.streaming.kafka010.OffsetRange
+import org.apache.kafka.clients.consumer.KafkaConsumer
+import org.mockito.MockitoAnnotations
+import org.slf4j.Logger
+
+class OffsetCommitterTest extends AnyFunSuite with Matchers {
+
+  // Mocking logger
+  val logger: Logger = mock(classOf[Logger])
+
+  // Mocking KafkaConsumer
+  val consumer: KafkaConsumer[String, String] = mock(classOf[KafkaConsumer[String, String]])
+
+  // Mocking OffsetRange
+  val offsetRange1: OffsetRange = OffsetRange("test-topic-1", 0, 0L, 100L)
+  val offsetRange2: OffsetRange = OffsetRange("test-topic-2", 1, 0L, 200L)
+  val offsetRanges: Array[OffsetRange] = Array(offsetRange1, offsetRange2)
+
+  // Test for updateOffset
+  test("updateOffset should commit offsets correctly and log messages") {
+    // Arrange
+    val committedOffset = mock(classOf[(KafkaConsumer[String, String], String, Int, Long) => Unit])
+
+    // Creating the instance of OffsetCommitter with the mocked committedOffset function
+    val offsetCommitter = new OffsetCommitter(consumer, offsetRanges, committedOffset)
+
+    // Act
+    offsetCommitter.updateOffset()
+
+    // Assert
+    verify(committedOffset).apply(consumer, "test-topic-1", 0, 100L)
+    verify(committedOffset).apply(consumer, "test-topic-2", 1, 200L)
+    verify(logger).info("Committing the Offset to Kafka - Started")
+    verify(logger).info("Committing the Offset to Kafka Completed")
+    verify(logger).info("Updating the email body with kafka topic details")
+  }
+}
 
