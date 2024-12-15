@@ -35,9 +35,20 @@ df.collect().foreach(row => {
       }
 
       // Run the query to count rows in the source table with the filter
-      val query = s"SELECT COUNT(*) AS cnt FROM $sourceTableName WHERE $filterColumn = '$dateToLoad'"
-      val result = spark.sql(query)
-      val sourceTableCount = result.collect()(0).getAs[Long]("cnt")
+      // Read data from Teradata using JDBC
+      val jdbcQuery = s"(SELECT COUNT(*) AS cnt FROM $sourceTableName WHERE $filterColumn = '$dateToLoad') AS subquery"
+      val sourceTableCountDF = spark.read
+        .format("jdbc")
+        .option("url", jdbcUrl)
+        .option("dbtable", jdbcQuery)
+        .option("user", jdbcUser)
+        .option("password", jdbcPassword)
+        .option("driver", "com.teradata.jdbc.TeraDriver")
+        .load()
+
+      // Extract the count
+      val sourceTableCount = sourceTableCountDF.collect()(0).getAs[Long]("cnt")
+      
 
       // Compare counts
       if (sourceTableCount == dtCount) {
