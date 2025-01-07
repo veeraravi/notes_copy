@@ -461,3 +461,56 @@ test("getDataFrameFromMessageRdd returns a DataFrame with the correct schema whe
     assert(resultDataFrame.schema == kafkaGenericMsgSchema) // Check schema
     assert(resultDataFrame.collect().sameElements(expectedData)) // Check data
   }
+---------------------------------------------------------------
+test("getDataFrameFromMessageRdd returns a DataFrame with the correct schema when messagesRDD is non-empty") {
+  // Mock SparkSession
+  val spark = SparkSession.builder()
+    .appName("Test")
+    .master("local[*]")
+    .getOrCreate()
+
+  import spark.implicits._
+
+  // Create test data for messagesRDD
+  val consumerRecords = Seq(
+    new ConsumerRecord[String, GenericRecord]("test-topic", 0, 1L, "key1", null),
+    new ConsumerRecord[String, GenericRecord]("test-topic", 1, 2L, "key2", null)
+  )
+
+  // Convert ConsumerRecords to an RDD
+  val messagesRDD: RDD[ConsumerRecord[String, GenericRecord]] = spark.sparkContext.parallelize(consumerRecords)
+
+  // Define the expected schema
+  val kafkaGenericMsgSchema = StructType(
+    List(
+      StructField("key", StringType, false),
+      StructField("value", StringType, false),
+      StructField("Kafka_topic", StringType, false),
+      StructField("Kafka_partitionId", IntegerType, false),
+      StructField("Kafka_offset", LongType, false),
+      StructField("Kafka_CreateTime", LongType, false),
+      StructField("timestampType", IntegerType, false)
+    )
+  )
+
+  // Expected data
+  val expectedData = Seq(
+    Row("key1", null, "test-topic", 0, 1L, null, null),
+    Row("key2", null, "test-topic", 1, 2L, null, null)
+  )
+
+  // Call the method to be tested
+  val resultDataFrame = YourClass.getDataFrameFromMessageRdd(messagesRDD, spark)
+
+  // Debugging: Print the schema
+  println("Schema of result DataFrame:")
+  resultDataFrame.printSchema()
+
+  // Debugging: Print the data
+  println("Data of result DataFrame:")
+  resultDataFrame.show()
+
+  // Assertions
+  assert(resultDataFrame.schema == kafkaGenericMsgSchema, "Schema mismatch!") // Check schema
+  assert(resultDataFrame.collect().sameElements(expectedData), "Data mismatch!") // Check data
+}
