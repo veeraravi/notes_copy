@@ -514,3 +514,59 @@ test("getDataFrameFromMessageRdd returns a DataFrame with the correct schema whe
   assert(resultDataFrame.schema == kafkaGenericMsgSchema, "Schema mismatch!") // Check schema
   assert(resultDataFrame.collect().sameElements(expectedData), "Data mismatch!") // Check data
 }
+-----------------------------------------------------
+
+ test("getValidAvroMessages processes valid schema and adds expected columns") {
+    // Mock SparkSession
+    val spark = mock[SparkSession](ReturnsDeepStubs)
+    when(spark.sparkContext).thenReturn(mock[SparkContext])
+
+    // Mock RDD
+    val messagesRDD = mock[RDD[ConsumerRecord[String, GenericRecord]]](ReturnsDeepStubs)
+
+    // Define test arguments
+    val sourceSchemaPath = "/path/to/schema"
+    val schemaRegistryURL = "http://localhost:8081"
+    val badRecordTargetLoc = "/path/to/bad/records"
+    val consumerGroupId = "test-consumer-group"
+    val datacenter = "us-east-1"
+    val loadWholeMsgInCol = "true"
+
+    val varArgs: List[Any] = List(sourceSchemaPath, schemaRegistryURL, badRecordTargetLoc, consumerGroupId, datacenter, loadWholeMsgInCol)
+
+    // Mock methods to load schema
+    val mockSchema = """{ "type": "record", "name": "Test", "fields": [{ "name": "field1", "type": "string" }] }"""
+    when(DCI_LauncherCommon.getSchemaFromFile(sourceSchemaPath)).thenReturn(mockSchema)
+
+    // Mock RestService and schema registry
+    val restService = mock[RestService]
+    val schemaRegistrySchema = new StructType().add("field1", "string")
+    when(restService.getLatestSchemaByTopic(inputTopic)).thenReturn(schemaRegistrySchema)
+
+    // Mock DataFrame transformations
+    val mockDF = mock[DataFrame]
+    when(mockDF.withColumn(any[String], any())).thenReturn(mockDF)
+    when(mockDF.select(any())).thenReturn(mockDF)
+
+    // Call the method
+    val resultDF = YourClass.getValidAvroMessages(spark, "test-topic", messagesRDD, varArgs)
+
+    // Verify transformations and schema
+    assert(resultDF.schema.fieldNames.contains("consumerGroupId"))
+    assert(resultDF.schema.fieldNames.contains("data_center_region"))
+    assert(resultDF.schema.fieldNames.contains("field1"))
+  }
+
+  test("getValidAvroMessages handles corrupt records correctly") {
+    // Setup similar to above but focus on corrupt record handling
+
+    // Mock DataFrame with corrupt records
+    val corruptRecordDF = mock[DataFrame]
+    when(corruptRecordDF.withColumn("corrupt_record", any())).thenReturn(corruptRecordDF)
+
+    // Verify bad record writing logic
+    assertDoesNotThrow {
+      writeBadRecords(corruptRecordDF, "/path/to/bad/records")
+    }
+  }
+
