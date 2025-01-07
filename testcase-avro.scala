@@ -606,4 +606,58 @@ test("getValidAvroMessages writes bad records when isBadRecordLocEnabled is true
   verify(writeBadRecordsMethod).apply(mockDF, badRecordTargetLoc)
 }
 
+======================================================================================================================
+test("getDataFrameFromMessageRdd returns a DataFrame with the correct schema and data when messagesRDD is non-empty") {
+  // Mock SparkSession and its components
+  val spark = mock[SparkSession](ReturnsDeepStubs)
+
+  // Define a real schema
+  val kafkaGenericMsgSchema = StructType(
+    List(
+      StructField("key", StringType, false),
+      StructField("value", StringType, false),
+      StructField("Kafka_topic", StringType, false),
+      StructField("Kafka_partitionId", IntegerType, false),
+      StructField("Kafka_offset", LongType, false),
+      StructField("Kafka_CreateTime", LongType, false),
+      StructField("timestampType", IntegerType, false)
+    )
+  )
+
+  // Define sample ConsumerRecord data
+  val consumerRecords = Seq(
+    new ConsumerRecord[String, GenericRecord]("topic1", 0, 1L, "key1", new GenericData.Record(null)),
+    new ConsumerRecord[String, GenericRecord]("topic1", 0, 2L, "key2", new GenericData.Record(null))
+  )
+
+  // Mock the RDD and its behavior
+  val messagesRDD = spark.sparkContext.parallelize(consumerRecords)
+
+  val mappedRows = consumerRecords.map(r =>
+    Row(
+      r.key(),
+      r.value().toString,
+      r.topic(),
+      r.partition(),
+      r.offset(),
+      r.timestamp(),
+      r.timestampType().id
+    )
+  )
+
+  val rowRDD = spark.sparkContext.parallelize(mappedRows)
+
+  // Mock DataFrame creation
+  val mockDataFrame = spark.createDataFrame(rowRDD, kafkaGenericMsgSchema)
+
+  when(messagesRDD.isEmpty()).thenReturn(false)
+  when(spark.createDataFrame(rowRDD, kafkaGenericMsgSchema)).thenReturn(mockDataFrame)
+
+  // Call the method under test
+  val result = getDataFrameFromMessageRdd(spark, messagesRDD)
+
+  // Assertions
+  assert(result.schema == kafkaGenericMsgSchema) // Verify schema
+  assert(result.collect().toSeq == mappedRows)   // Verify data
+}
 
