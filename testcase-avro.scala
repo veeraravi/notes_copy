@@ -710,3 +710,57 @@ test("getDataFrameFromMessageRdd returns a DataFrame with the correct schema and
   assert(result.collect().toSeq == mockedRows)   // Verify data
 }
 
+
+
+test("getDataFrameFromMessageRdd returns a DataFrame with the correct schema and data when messagesRDD is non-empty") {
+  // Create a real SparkSession for accurate schema comparison
+  val spark = SparkSession.builder()
+    .appName("Test")
+    .master("local[*]")
+    .getOrCreate()
+
+  // Define the expected schema
+  val kafkaGenericMsgSchema = StructType(
+    List(
+      StructField("key", StringType, false),
+      StructField("value", StringType, false),
+      StructField("Kafka_topic", StringType, false),
+      StructField("Kafka_partitionId", IntegerType, false),
+      StructField("Kafka_offset", LongType, false),
+      StructField("Kafka_CreateTime", LongType, false),
+      StructField("timestampType", IntegerType, false)
+    )
+  )
+
+  // Define sample data matching the schema
+  val sampleData = Seq(
+    Row("key1", """{"field1":"value1"}""", "topic1", 0, 100L, 1633046400000L, 1),
+    Row("key2", """{"field1":"value2"}""", "topic1", 1, 200L, 1633046460000L, 1)
+  )
+
+  // Create an RDD of Rows from the sample data
+  val rowRDD = spark.sparkContext.parallelize(sampleData)
+
+  // Create the expected DataFrame
+  val expectedDataFrame = spark.createDataFrame(rowRDD, kafkaGenericMsgSchema)
+
+  // Mock the input messagesRDD
+  val messagesRDD = mock[RDD[ConsumerRecord[String, GenericRecord]]]
+  when(messagesRDD.isEmpty()).thenReturn(false)
+
+  // Call the method under test
+  val result = getDataFrameFromMessageRdd(spark, messagesRDD)
+
+  // Print debugging information
+  println("Result Schema: " + result.schema.treeString)
+  println("Expected Schema: " + kafkaGenericMsgSchema.treeString)
+  println("Result Data: " + result.collect().toSeq)
+  println("Expected Data: " + sampleData)
+
+  // Assertions
+  assert(result.schema == kafkaGenericMsgSchema) // Verify schema matches
+  assert(result.collect().toSeq == sampleData)   // Verify data matches
+
+  spark.stop()
+}
+
