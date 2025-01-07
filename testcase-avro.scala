@@ -472,6 +472,138 @@ class ParseXMLMessageTest extends AnyFunSuite with Matchers {
     result shouldBe """<root><data>no-row-tag</data></root><Kafka_topic>test-topic</Kafka_topic><Kafka_offset>123</Kafka_offset><Kafka_partitionId>1</Kafka_partitionId><Kafka_CreateTime>1633022820000</Kafka_CreateTime></row>"""
   }
 }
+==========================================================
+Here are the unit test cases for the getValidAvroMessages function based on the pattern of previous test cases. These tests cover both the happy path and error scenarios.
 
+Unit Test Cases
+Test Case 1: When messagesRDD is empty
+scala
+Copy code
+test("getValidAvroMessages returns an empty DataFrame when messagesRDD is empty") {
+  val spark = mock[SparkSession](ReturnsDeepStubs)
+  val messagesRDD = mock[RDD[ConsumerRecord[String, GenericRecord]]]
+  
+  val sourceSchemaPath = "/path/to/schema.json"
+  val schemaRegistryURL = "http://mock-schema-registry"
+  val badRecordTargetLoc = "/path/to/bad/records"
+  val consumerGroupId = "consumer-group-1"
+  val datacenter = "datacenter-1"
+  val loadWholeMsgInCol = "false"
+
+  val varArgs = List(sourceSchemaPath, schemaRegistryURL, badRecordTargetLoc, consumerGroupId, datacenter, loadWholeMsgInCol)
+  val emptyRDD = spark.sparkContext.emptyRDD[ConsumerRecord[String, GenericRecord]]
+
+  when(messagesRDD.isEmpty()).thenReturn(true)
+  when(spark.createDataFrame(emptyRDD, StructType(Nil))).thenReturn(mock[DataFrame])
+
+  val result = getValidAvroMessages(spark, "test-topic", messagesRDD, varArgs)
+
+  assert(result.isEmpty)
+}
+Test Case 2: When schemaRegistryURL is valid and messagesRDD is non-empty
+scala
+Copy code
+test("getValidAvroMessages processes non-empty messagesRDD with a valid schema registry URL") {
+  val spark = mock[SparkSession](ReturnsDeepStubs)
+  val messagesRDD = mock[RDD[ConsumerRecord[String, GenericRecord]]]
+
+  val sourceSchemaPath = "/path/to/schema.json"
+  val schemaRegistryURL = "http://mock-schema-registry"
+  val badRecordTargetLoc = "/path/to/bad/records"
+  val consumerGroupId = "consumer-group-1"
+  val datacenter = "datacenter-1"
+  val loadWholeMsgInCol = "true"
+
+  val varArgs = List(sourceSchemaPath, schemaRegistryURL, badRecordTargetLoc, consumerGroupId, datacenter, loadWholeMsgInCol)
+  
+  val rowRDD = spark.sparkContext.parallelize(Seq(Row("key1", "value1", "topic", 1, 1L, 1633046400000L, 1)))
+
+  val mockSchemaRegistry = StructType(List(
+    StructField("key", StringType, true),
+    StructField("value", StringType, true),
+    StructField("Kafka_topic", StringType, true),
+    StructField("Kafka_partitionId", IntegerType, true),
+    StructField("Kafka_offset", LongType, true),
+    StructField("Kafka_CreateTime", LongType, true),
+    StructField("timestampType", IntegerType, true)
+  ))
+
+  val mockDF = spark.createDataFrame(rowRDD, mockSchemaRegistry)
+
+  when(messagesRDD.isEmpty()).thenReturn(false)
+  when(spark.createDataFrame(rowRDD, mockSchemaRegistry)).thenReturn(mockDF)
+
+  val result = getValidAvroMessages(spark, "test-topic", messagesRDD, varArgs)
+
+  assert(result.schema == mockSchemaRegistry)
+  assert(!result.isEmpty)
+}
+Test Case 3: When schemaRegistryURL is empty
+scala
+Copy code
+test("getValidAvroMessages logs and returns DataFrame without parsing when schemaRegistryURL is empty") {
+  val spark = mock[SparkSession](ReturnsDeepStubs)
+  val messagesRDD = mock[RDD[ConsumerRecord[String, GenericRecord]]]
+
+  val sourceSchemaPath = "/path/to/schema.json"
+  val schemaRegistryURL = ""
+  val badRecordTargetLoc = "/path/to/bad/records"
+  val consumerGroupId = "consumer-group-1"
+  val datacenter = "datacenter-1"
+  val loadWholeMsgInCol = "false"
+
+  val varArgs = List(sourceSchemaPath, schemaRegistryURL, badRecordTargetLoc, consumerGroupId, datacenter, loadWholeMsgInCol)
+  val rowRDD = spark.sparkContext.parallelize(Seq(Row("key1", "value1", "topic", 1, 1L, 1633046400000L, 1)))
+
+  val mockSchema = StructType(List(
+    StructField("key", StringType, true),
+    StructField("value", StringType, true)
+  ))
+
+  val mockDF = spark.createDataFrame(rowRDD, mockSchema)
+
+  when(messagesRDD.isEmpty()).thenReturn(false)
+  when(spark.createDataFrame(rowRDD, mockSchema)).thenReturn(mockDF)
+
+  val result = getValidAvroMessages(spark, "test-topic", messagesRDD, varArgs)
+
+  assert(result.schema == mockSchema)
+}
+Test Case 4: When isBadRecordLocEnabled is true
+scala
+Copy code
+test("getValidAvroMessages writes bad records when isBadRecordLocEnabled is true") {
+  val spark = mock[SparkSession](ReturnsDeepStubs)
+  val messagesRDD = mock[RDD[ConsumerRecord[String, GenericRecord]]]
+
+  val sourceSchemaPath = "/path/to/schema.json"
+  val schemaRegistryURL = "http://mock-schema-registry"
+  val badRecordTargetLoc = "/path/to/bad/records"
+  val consumerGroupId = "consumer-group-1"
+  val datacenter = "datacenter-1"
+  val loadWholeMsgInCol = "false"
+
+  val varArgs = List(sourceSchemaPath, schemaRegistryURL, badRecordTargetLoc, consumerGroupId, datacenter, loadWholeMsgInCol)
+  val rowRDD = spark.sparkContext.parallelize(Seq(Row("key1", "corrupt_value")))
+
+  val mockSchema = StructType(List(
+    StructField("key", StringType, true),
+    StructField("value", StringType, true)
+  ))
+
+  val mockDF = spark.createDataFrame(rowRDD, mockSchema)
+
+  when(messagesRDD.isEmpty()).thenReturn(false)
+  when(spark.createDataFrame(rowRDD, mockSchema)).thenReturn(mockDF)
+
+  // Mock writing bad records
+  val writeBadRecordsMethod = mock[Unit]
+  when(writeBadRecordsMethod(mockDF, badRecordTargetLoc)).thenReturn(())
+
+  val result = getValidAvroMessages(spark, "test-topic", messagesRDD, varArgs)
+
+  assert(result.schema == mockSchema)
+  verify(writeBadRecordsMethod).apply(mockDF, badRecordTargetLoc)
+}
 
 
