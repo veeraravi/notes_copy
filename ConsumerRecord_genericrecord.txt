@@ -321,3 +321,104 @@ test("getDataFrameFromMessageRdd processes RDD[ConsumerRecord[String, GenericRec
 
   spark.stop()
 }
+//aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.avro.generic.{GenericData, GenericRecord}
+import org.apache.avro.Schema
+import org.apache.spark.SparkContext
+import org.apache.spark.sql.{Row, SparkSession}
+import org.apache.spark.sql.types._
+import org.apache.spark.rdd.RDD
+
+// Define a case class for serialized ConsumerRecord
+case class SerializableConsumerRecord(
+    key: String,
+    value: String,
+    topic: String,
+    partition: Int,
+    offset: Long,
+    timestamp: Long,
+    timestampType: Int
+)
+
+test("getDataFrameFromMessageRdd processes RDD[ConsumerRecord[String, GenericRecord]] correctly") {
+  // Create SparkSession
+  val spark = SparkSession.builder()
+    .appName("Test")
+    .master("local[*]")
+    .getOrCreate()
+
+  val sc = spark.sparkContext
+
+  // Define the Avro schema
+  val schemaString =
+    """
+      |{
+      | "type": "record",
+      | "name": "TestRecord",
+      | "fields": [
+      |   {"name": "field1", "type": "string"},
+      |   {"name": "field2", "type": "int"}
+      | ]
+      |}
+    """.stripMargin
+  val avroSchema = new Schema.Parser().parse(schemaString)
+
+  // Create sample GenericRecord data
+  val record1 = new GenericData.Record(avroSchema)
+  record1.put("field1", "value1")
+  record1.put("field2", 100)
+
+  val record2 = new GenericData.Record(avroSchema)
+  record2.put("field1", "value2")
+  record2.put("field2", 200)
+
+  // Create ConsumerRecord instances
+  val consumerRecord1 = new ConsumerRecord[String, GenericRecord](
+    "topic1", // topic
+    0,        // partition
+    1L,       // offset
+    "key1",   // key
+    record1   // value
+  )
+
+  val consumerRecord2 = new ConsumerRecord[String, GenericRecord](
+    "topic1", // topic
+    0,        // partition
+    2L,       // offset
+    "key2",   // key
+    record2   // value
+  )
+
+  // Create RDD[ConsumerRecord[String, GenericRecord]]
+  val messagesRDD: RDD[ConsumerRecord[String, GenericRecord]] = sc.parallelize(Seq(consumerRecord1, consumerRecord2))
+
+  // Call the method under test: getDataFrameFromMessageRdd
+  val resultDF = getDataFrameFromMessageRdd(spark, messagesRDD)
+
+  // Define the expected schema
+  val expectedSchema = StructType(
+    List(
+      StructField("key", StringType, false),
+      StructField("value", StringType, false),
+      StructField("Kafka_topic", StringType, false),
+      StructField("Kafka_partitionId", IntegerType, false),
+      StructField("Kafka_offset", LongType, false),
+      StructField("Kafka_CreateTime", LongType, false),
+      StructField("timestampType", IntegerType, false)
+    )
+  )
+
+  // Assertions
+  assert(resultDF.schema == expectedSchema) // Verify schema
+  assert(resultDF.count() == 2)             // Verify row count
+  val resultKeys = resultDF.collect().map(row => row.getAs[String]("key"))
+  assert(resultKeys.contains("key1"))
+  assert(resultKeys.contains("key2"))
+
+  // Print the result for debugging
+  resultDF.show()
+
+  spark.stop()
+}
