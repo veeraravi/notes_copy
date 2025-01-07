@@ -1,0 +1,92 @@
+Here’s how you can create sample data to generate an RDD of ConsumerRecord[String, GenericRecord] in Scala:
+
+Step-by-Step Code to Create Sample RDD
+
+import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.avro.generic.{GenericData, GenericRecord}
+import org.apache.avro.Schema
+import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
+
+// Define a function to create the RDD
+def createSampleRDD(sc: SparkContext): RDD[ConsumerRecord[String, GenericRecord]] = {
+  // Define the Avro schema
+  val schemaString =
+    """
+      |{
+      | "type": "record",
+      | "name": "TestRecord",
+      | "fields": [
+      |   {"name": "field1", "type": "string"},
+      |   {"name": "field2", "type": "int"}
+      | ]
+      |}
+    """.stripMargin
+  val schema = new Schema.Parser().parse(schemaString)
+
+  // Create sample GenericRecord data
+  val record1 = new GenericData.Record(schema)
+  record1.put("field1", "value1")
+  record1.put("field2", 100)
+
+  val record2 = new GenericData.Record(schema)
+  record2.put("field1", "value2")
+  record2.put("field2", 200)
+
+  // Create ConsumerRecord instances with the GenericRecord as value
+  val consumerRecord1 = new ConsumerRecord[String, GenericRecord](
+    "topic1", // topic
+    0,        // partition
+    1L,       // offset
+    "key1",   // key
+    record1   // value
+  )
+
+  val consumerRecord2 = new ConsumerRecord[String, GenericRecord](
+    "topic1", // topic
+    0,        // partition
+    2L,       // offset
+    "key2",   // key
+    record2   // value
+  )
+
+  // Create an RDD from the ConsumerRecords
+  sc.parallelize(Seq(consumerRecord1, consumerRecord2))
+}
+
+// Usage example (assuming SparkContext exists as `sc`):
+// val messagesRDD = createSampleRDD(sc)
+
+Explanation of the Code
+	1.	Define Avro Schema:
+	•	Used a JSON string to define a simple Avro schema with fields field1 (string) and field2 (int).
+	•	Parsed it into an Avro Schema object.
+	2.	Create GenericRecord Data:
+	•	Created GenericRecord objects (record1 and record2) with the defined schema.
+	•	Populated the records with sample data.
+	3.	Create ConsumerRecord Instances:
+	•	Created Kafka ConsumerRecord objects with:
+	•	String as the key.
+	•	GenericRecord as the value.
+	•	Sample values for topic, partition, offset, and key.
+	4.	Create RDD:
+	•	Used sc.parallelize to create an RDD containing the sample ConsumerRecord objects.
+
+Example Output
+
+The resulting RDD contains ConsumerRecord objects like:
+
+ConsumerRecord(topic = topic1, partition = 0, offset = 1, key = key1, value = {"field1": "value1", "field2": 100})
+ConsumerRecord(topic = topic1, partition = 0, offset = 2, key = key2, value = {"field1": "value2", "field2": 200})
+
+How to Use
+
+You can use this RDD as the input messagesRDD for testing your getDataFrameFromMessageRdd method. For example:
+
+val messagesRDD = createSampleRDD(sc)
+val resultDF = getDataFrameFromMessageRdd(spark, messagesRDD)
+
+// Validate the DataFrame schema and data as needed
+resultDF.show()
+
+Let me know if you need further clarification or modifications!
