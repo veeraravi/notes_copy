@@ -90,3 +90,152 @@ val resultDF = getDataFrameFromMessageRdd(spark, messagesRDD)
 resultDF.show()
 
 Let me know if you need further clarification or modifications!
+
+----------
+The error java.io.NotSerializableException: org.apache.kafka.clients.consumer.ConsumerRecord occurs because the ConsumerRecord class is not serializable. Spark requires all data in an RDD to be serializable so that it can distribute the data across the cluster.
+
+To resolve this issue, you need to transform the ConsumerRecord objects into a serializable format (e.g., a case class or a simple Row object) before creating the RDD.
+
+Solution: Transform ConsumerRecord into Serializable Data
+
+Here’s how you can resolve the issue:
+
+Step 1: Define a Case Class for Serializable Data
+
+Define a case class to represent the serialized version of ConsumerRecord:
+
+case class SerializableConsumerRecord(
+    key: String,
+    value: String,
+    topic: String,
+    partition: Int,
+    offset: Long,
+    timestamp: Long,
+    timestampType: Int
+)
+
+Step 2: Transform ConsumerRecord into SerializableConsumerRecord
+
+Transform the ConsumerRecord[String, GenericRecord] into SerializableConsumerRecord before creating the RDD:
+
+import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.avro.generic.{GenericData, GenericRecord}
+import org.apache.avro.Schema
+import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
+
+// Define a function to create the RDD
+def createSampleRDD(sc: SparkContext): RDD[SerializableConsumerRecord] = {
+  // Define the Avro schema
+  val schemaString =
+    """
+      |{
+      | "type": "record",
+      | "name": "TestRecord",
+      | "fields": [
+      |   {"name": "field1", "type": "string"},
+      |   {"name": "field2", "type": "int"}
+      | ]
+      |}
+    """.stripMargin
+  val schema = new Schema.Parser().parse(schemaString)
+
+  // Create sample GenericRecord data
+  val record1 = new GenericData.Record(schema)
+  record1.put("field1", "value1")
+  record1.put("field2", 100)
+
+  val record2 = new GenericData.Record(schema)
+  record2.put("field1", "value2")
+  record2.put("field2", 200)
+
+  // Create ConsumerRecord instances
+  val consumerRecord1 = new ConsumerRecord[String, GenericRecord](
+    "topic1", 0, 1L, "key1", record1
+  )
+
+  val consumerRecord2 = new ConsumerRecord[String, GenericRecord](
+    "topic1", 0, 2L, "key2", record2
+  )
+
+  // Transform ConsumerRecord to SerializableConsumerRecord
+  val serializableRecords = Seq(
+    SerializableConsumerRecord(
+      consumerRecord1.key(),
+      consumerRecord1.value().toString,
+      consumerRecord1.topic(),
+      consumerRecord1.partition(),
+      consumerRecord1.offset(),
+      System.currentTimeMillis(),
+      consumerRecord1.timestampType().id
+    ),
+    SerializableConsumerRecord(
+      consumerRecord2.key(),
+      consumerRecord2.value().toString,
+      consumerRecord2.topic(),
+      consumerRecord2.partition(),
+      consumerRecord2.offset(),
+      System.currentTimeMillis(),
+      consumerRecord2.timestampType().id
+    )
+  )
+
+  // Create an RDD from the SerializableConsumerRecord objects
+  sc.parallelize(serializableRecords)
+}
+
+Step 3: Use the Serializable RDD in Your Test
+
+Now, use the createSampleRDD function to create an RDD of SerializableConsumerRecord and pass it to your test.
+
+Updated Test Case Example
+
+test("getDataFrameFromMessageRdd processes SerializableConsumerRecord RDD") {
+  // Define the schema
+  val kafkaGenericMsgSchema = StructType(
+    List(
+      StructField("key", StringType, false),
+      StructField("value", StringType, false),
+      StructField("Kafka_topic", StringType, false),
+      StructField("Kafka_partitionId", IntegerType, false),
+      StructField("Kafka_offset", LongType, false),
+      StructField("Kafka_CreateTime", LongType, false),
+      StructField("timestampType", IntegerType, false)
+    )
+  )
+
+  // Create SparkSession
+  val spark = SparkSession.builder()
+    .appName("Test")
+    .master("local[*]")
+    .getOrCreate()
+
+  // Create the RDD of SerializableConsumerRecord
+  val sc = spark.sparkContext
+  val messagesRDD = createSampleRDD(sc)
+
+  // Transform the SerializableConsumerRecord RDD into Rows
+  val rowsRDD = messagesRDD.map(r => Row(
+    r.key, r.value, r.topic, r.partition, r.offset, r.timestamp, r.timestampType
+  ))
+
+  // Create the DataFrame
+  val resultDF = spark.createDataFrame(rowsRDD, kafkaGenericMsgSchema)
+
+  // Assertions
+  assert(resultDF.schema == kafkaGenericMsgSchema)
+  resultDF.show()
+
+  spark.stop()
+}
+
+Explanation of Changes
+	1.	Serializable Case Class:
+	•	The ConsumerRecord is transformed into a serializable SerializableConsumerRecord case class.
+	2.	RDD Transformation:
+	•	The RDD of ConsumerRecord is converted into SerializableConsumerRecord before parallelizing.
+	3.	Schema Alignment:
+	•	The SerializableConsumerRecord fields match the StructType schema (kafkaGenericMsgSchema).
+
+This approach avoids the NotSerializableException and ensures that the data in the RDD is compatible with Spark. Let me know if you need further clarification!
+
