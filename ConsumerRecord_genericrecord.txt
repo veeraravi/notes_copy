@@ -239,3 +239,85 @@ Explanation of Changes
 
 This approach avoids the NotSerializableException and ensures that the data in the RDD is compatible with Spark. Let me know if you need further clarification!
 
+======================================================
+
+import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.avro.generic.{GenericData, GenericRecord}
+import org.apache.avro.Schema
+import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
+
+// Function to create RDD[ConsumerRecord[String, GenericRecord]]
+def createConsumerRecordRDD(sc: SparkContext): RDD[ConsumerRecord[String, GenericRecord]] = {
+  // Define the Avro schema
+  val schemaString =
+    """
+      |{
+      | "type": "record",
+      | "name": "TestRecord",
+      | "fields": [
+      |   {"name": "field1", "type": "string"},
+      |   {"name": "field2", "type": "int"}
+      | ]
+      |}
+    """.stripMargin
+  val schema = new Schema.Parser().parse(schemaString)
+
+  // Create sample GenericRecord data
+  val record1 = new GenericData.Record(schema)
+  record1.put("field1", "value1")
+  record1.put("field2", 100)
+
+  val record2 = new GenericData.Record(schema)
+  record2.put("field1", "value2")
+  record2.put("field2", 200)
+
+  // Create ConsumerRecord instances
+  val consumerRecord1 = new ConsumerRecord[String, GenericRecord](
+    "topic1", // topic
+    0,        // partition
+    1L,       // offset
+    "key1",   // key
+    record1   // value
+  )
+
+  val consumerRecord2 = new ConsumerRecord[String, GenericRecord](
+    "topic1", // topic
+    0,        // partition
+    2L,       // offset
+    "key2",   // key
+    record2   // value
+  )
+
+  // Create an RDD directly from the ConsumerRecord objects
+  sc.parallelize(Seq(consumerRecord1, consumerRecord2))
+}
+
+// Usage Example
+// Assuming `sc` is your SparkContext
+// val messagesRDD = createConsumerRecordRDD(sc)
+
+test("getDataFrameFromMessageRdd processes RDD[ConsumerRecord[String, GenericRecord]]") {
+  val spark = SparkSession.builder()
+    .appName("Test")
+    .master("local[*]")
+    .getOrCreate()
+
+  val sc = spark.sparkContext
+
+  // Create the RDD of ConsumerRecord[String, GenericRecord]
+  val messagesRDD = createConsumerRecordRDD(sc)
+
+  // Call the method under test
+  val resultDF = getDataFrameFromMessageRdd(spark, messagesRDD)
+
+  // Assertions
+  resultDF.show() // Print the resulting DataFrame for debugging
+
+  // Verify schema and data
+  assert(resultDF.schema.fields.map(_.name).toSeq == Seq(
+    "key", "value", "Kafka_topic", "Kafka_partitionId", "Kafka_offset", "Kafka_CreateTime", "timestampType"
+  ))
+
+  spark.stop()
+}
