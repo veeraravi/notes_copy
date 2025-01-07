@@ -661,3 +661,52 @@ test("getDataFrameFromMessageRdd returns a DataFrame with the correct schema and
   assert(result.collect().toSeq == mappedRows)   // Verify data
 }
 
+
+
+test("getDataFrameFromMessageRdd returns a DataFrame with the correct schema and data when messagesRDD is non-empty") {
+  // Mock SparkSession and its components
+  val spark = mock[SparkSession](ReturnsDeepStubs)
+
+  // Define the schema as per kafkaGenericMsgSchema
+  val kafkaGenericMsgSchema = StructType(
+    List(
+      StructField("key", StringType, false),
+      StructField("value", StringType, false),
+      StructField("Kafka_topic", StringType, false),
+      StructField("Kafka_partitionId", IntegerType, false),
+      StructField("Kafka_offset", LongType, false),
+      StructField("Kafka_CreateTime", LongType, false),
+      StructField("timestampType", IntegerType, false)
+    )
+  )
+
+  // Define a mock RDD of Row
+  val rowRDD = mock[RDD[Row]]
+
+  // Mock the data that the RDD would contain
+  val mockedRows = Seq(
+    Row("key1", """{"field1":"value1"}""", "topic1", 0, 100L, 1633046400000L, 1),
+    Row("key2", """{"field1":"value2"}""", "topic1", 1, 200L, 1633046460000L, 1)
+  )
+
+  // Mock the behavior of RDD to return the mocked data
+  when(rowRDD.collect()).thenReturn(mockedRows.toArray)
+
+  // Mock the creation of DataFrame
+  val mockDataFrame = mock[DataFrame]
+  when(mockDataFrame.schema).thenReturn(kafkaGenericMsgSchema)
+  when(mockDataFrame.collect()).thenReturn(mockedRows.toArray)
+
+  // Mock RDD and DataFrame creation in SparkSession
+  val messagesRDD = mock[RDD[ConsumerRecord[String, GenericRecord]]]
+  when(messagesRDD.isEmpty()).thenReturn(false) // Mock messagesRDD is non-empty
+  when(spark.createDataFrame(rowRDD, kafkaGenericMsgSchema)).thenReturn(mockDataFrame)
+
+  // Call the method under test
+  val result = getDataFrameFromMessageRdd(spark, messagesRDD)
+
+  // Assertions
+  assert(result.schema == kafkaGenericMsgSchema) // Verify schema
+  assert(result.collect().toSeq == mockedRows)   // Verify data
+}
+
