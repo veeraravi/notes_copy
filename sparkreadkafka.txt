@@ -47,3 +47,88 @@ object KafkaAvroReaderFixed {
     schemaMetadata.getSchema
   }
 }
+--------------------------------
+
+
+import org.apache.spark.sql.{SparkSession, DataFrame}
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.avro.from_avro
+import org.apache.avro.Schema
+import java.math.BigDecimal
+
+object KafkaAvroDynamicDecimalConverter {
+  def main(args: Array[String]): Unit = {
+    val spark = SparkSession.builder()
+      .appName("KafkaAvroDynamicDecimalConverter")
+      .master("local[*]")
+      .getOrCreate()
+
+    val kafkaBootstrapServers = "localhost:9092"
+    val kafkaTopic = "your_topic"
+    val schemaRegistryUrl = "http://localhost:8081"
+
+    // Read data from Kafka
+    val kafkaDF = spark.read
+      .format("kafka")
+      .option("kafka.bootstrap.servers", kafkaBootstrapServers)
+      .option("subscribe", kafkaTopic)
+      .option("startingOffsets", "earliest")
+      .load()
+
+    // Fetch Avro schema
+    val avroSchema = getAvroSchema(schemaRegistryUrl, kafkaTopic)
+
+    // Deserialize Avro data
+    val deserializedDF = kafkaDF
+      .withColumn("avroData", from_avro(col("value"), avroSchema))
+
+    // Dynamically convert decimal fields
+    val convertedDF = convertDecimalFields(deserializedDF, avroSchema)
+
+    // Show final output
+    convertedDF.show(false)
+
+    spark.stop()
+  }
+
+  // Helper function to fetch Avro schema from Schema Registry
+  def getAvroSchema(schemaRegistryUrl: String, topic: String): String = {
+    import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient
+
+    val schemaRegistryClient = new CachedSchemaRegistryClient(schemaRegistryUrl, 100)
+    val subject = s"$topic-value"
+    val schemaMetadata = schemaRegistryClient.getLatestSchemaMetadata(subject)
+    schemaMetadata.getSchema
+  }
+
+  // Dynamically convert all decimal fields
+  def convertDecimalFields(df: DataFrame, schemaString: String): DataFrame = {
+    val schema = new Schema.Parser().parse(schemaString)
+
+    // Identify fields with logicalType: decimal
+    val decimalFields = schema.getFields.toArray.collect {
+      case field: Schema.Field if field.schema().getType == Schema.Type.BYTES &&
+                                   Option(field.schema().getLogicalType).exists(_.getName == "decimal") =>
+        (field.name(), field.schema().getObjectProp("precision").toString.toInt, field.schema().getObjectProp("scale").toString.toInt)
+    }
+
+    // Apply conversion for all decimal fields
+    decimalFields.foldLeft(df) { case (tempDF, (colName, precision, scale)) =>
+      tempDF.withColumn(colName, convertDecimal(col(s"avroData.$colName"), precision, scale))
+    }
+  }
+
+  // UDF to convert Avro decimal (bytes) to BigDecimal
+  def convertDecimal(column: org.apache.spark.sql.Column, precision: Int, scale: Int): org.apache.spark.sql.Column = {
+    val decimalUDF = udf((bytes: Array[Byte]) => {
+      if (bytes == null) null
+      else {
+        val bigDecimal = new BigDecimal(new java.math.BigInteger(bytes), scale)
+        bigDecimal.setScale(scale)
+      }
+    })
+    decimalUDF(column)
+  }
+}
+
+
