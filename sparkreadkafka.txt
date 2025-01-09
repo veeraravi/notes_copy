@@ -1,0 +1,49 @@
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.avro.from_avro
+
+object KafkaAvroReaderFixed {
+  def main(args: Array[String]): Unit = {
+    // Create SparkSession
+    val spark = SparkSession.builder()
+      .appName("KafkaAvroReaderFixed")
+      .master("local[*]")
+      .getOrCreate()
+
+    // Kafka and Schema Registry configurations
+    val kafkaBootstrapServers = "localhost:9092" // Kafka broker(s)
+    val kafkaTopic = "your_topic"                // Kafka topic
+    val schemaRegistryUrl = "http://localhost:8081" // Schema Registry URL
+
+    // Read data from Kafka
+    val kafkaDF = spark.read
+      .format("kafka")
+      .option("kafka.bootstrap.servers", kafkaBootstrapServers)
+      .option("subscribe", kafkaTopic)
+      .option("startingOffsets", "earliest")
+      .load()
+
+    // Deserialize the key (as String) and value (as Avro)
+    val deserializedDF = kafkaDF
+      .select(
+        expr("CAST(key AS STRING)").as("key"),   // Cast key to String
+        col("value")                             // Keep value as byte array for Avro deserialization
+      )
+      .withColumn("avroData", from_avro(col("value"), getAvroSchema(schemaRegistryUrl, kafkaTopic)))
+
+    // Display the results
+    deserializedDF.select("key", "avroData.*").show(false)
+
+    spark.stop()
+  }
+
+  // Helper function to fetch Avro schema from Schema Registry
+  def getAvroSchema(schemaRegistryUrl: String, topic: String): String = {
+    import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient
+
+    val schemaRegistryClient = new CachedSchemaRegistryClient(schemaRegistryUrl, 100)
+    val subject = s"$topic-value" // Standard naming for Schema Registry subjects
+    val schemaMetadata = schemaRegistryClient.getLatestSchemaMetadata(subject)
+    schemaMetadata.getSchema
+  }
+}
