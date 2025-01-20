@@ -94,3 +94,55 @@ object ConvertBytesToDecimal {
   }
 }
 }
+import scala.util.matching.Regex
+import java.nio.ByteBuffer
+import java.math.BigInteger
+import java.math.BigDecimal
+
+object ConvertBytesToDecimal {
+  def main(args: Array[String]): Unit = {
+    // Example input JSON as a string
+    val jsonString = """
+      {
+        "Message": {
+          "ApplicationNumber": "6508213",
+          "DebtRatio": { "bytes": "\u00040" },
+          "MaxDTI": { "bytes": "\u0005\u0014" },
+          "MaxPTI": { "bytes": "\u0019d" },
+          "MonthlyDebtPayment": { "bytes": "\u00041D" },
+          "PTI": { "bytes": "\u0017W" }
+        }
+      }
+    """
+
+    // Regex to find all { "bytes": "\u...." }
+    val byteRegex: Regex = """\{ *"bytes": *"([^"]+)" *\}""".r
+
+    // Function to convert the byte sequence to a BigDecimal with scale
+    def bytesToScaledDecimal(bytesString: String, scale: Int): BigDecimal = {
+      // Decode the Unicode escape sequences correctly
+      val bytes = bytesString.replace("\\u", "").sliding(4, 4).map { hex =>
+        Integer.parseInt(hex, 16).toByte
+      }.toArray
+
+      // Convert bytes to BigInteger and then to BigDecimal
+      val bigInt = new BigInteger(1, bytes) // Use (1, bytes) to ensure positive values
+      new BigDecimal(bigInt, scale)
+    }
+
+    // Replace all matches with their scaled decimal representation
+    val convertedJson = byteRegex.replaceAllIn(jsonString, m => {
+      try {
+        val byteValue = m.group(1) // Extract the "\u...." part
+        val decimalValue = bytesToScaledDecimal(byteValue, 2) // Convert to scaled decimal
+        s""""$decimalValue"""" // Replace with decimal value
+      } catch {
+        case e: Exception => s""""Error: ${e.getMessage}"""" // Handle errors gracefully
+      }
+    })
+
+    println("Converted JSON:")
+    println(convertedJson)
+  }
+}
+
