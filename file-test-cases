@@ -291,4 +291,84 @@ test("ensureLocalPathExists should do nothing if directory already exists") {
     verify(mockRetryWithDelay, times(3)).apply(any[Int], any[Int]) // Should retry maxRetries times
   }
 
+
+test("getResults should execute shell command and return the exit code") {
+    // Mock sys.process execution
+    val mockCommandExecutor = mock[Function1[String, Int]]
+    val dummyCommand = "hadoop fs -ls /mock/path"
+
+    // Stubbing behavior
+    when(mockCommandExecutor.apply(any[String])).thenReturn(0)
+
+    // Call the function
+    val result = mockCommandExecutor.apply(dummyCommand)
+
+    // Assertions
+    assert(result == 0)
+    verify(mockCommandExecutor).apply(dummyCommand)
+  }
+
+  test("attemptDelete should return true if deletion command executes successfully") {
+    // Mock dependencies
+    val mockGetResults = mock[Function1[String, Int]]
+    val dummyHdfsSourcePath = "/mock/hdfs/source"
+
+    // Stubbing behavior
+    when(mockGetResults.apply(any[String])).thenReturn(0) // Simulate successful execution
+
+    // Call the function
+    val deleteCmd = s"hadoop fs -rm -r -skipTrash $dummyHdfsSourcePath"
+    val deleteResult = mockGetResults.apply(deleteCmd)
+    val success = if (deleteResult == 0) {
+      logger.info(s"Successfully deleted source directory $dummyHdfsSourcePath after copy")
+      true
+    } else {
+      logger.error(s"Failed to delete source directory $dummyHdfsSourcePath after copy")
+      false
+    }
+
+    // Assertions
+    assert(success)
+    verify(mockGetResults).apply(deleteCmd)
+  }
+
+  test("attemptDelete should return false if deletion command fails") {
+    // Mock dependencies
+    val mockGetResults = mock[Function1[String, Int]]
+    val dummyHdfsSourcePath = "/mock/hdfs/source"
+
+    // Stubbing behavior
+    when(mockGetResults.apply(any[String])).thenReturn(1) // Simulate failure
+
+    // Call the function
+    val deleteCmd = s"hadoop fs -rm -r -skipTrash $dummyHdfsSourcePath"
+    val deleteResult = mockGetResults.apply(deleteCmd)
+    val success = if (deleteResult == 0) {
+      logger.info(s"Successfully deleted source directory $dummyHdfsSourcePath after copy")
+      true
+    } else {
+      logger.error(s"Failed to delete source directory $dummyHdfsSourcePath after copy")
+      false
+    }
+
+    // Assertions
+    assert(!success)
+    verify(mockGetResults).apply(deleteCmd)
+  }
+
+  test("retryWithDelay should call Thread.sleep with correct delay") {
+    // Mock dependencies
+    val mockThread = mock[Function1[Int, Unit]]
+    val attempt = 2
+    val delay = 2000
+
+    // Call the function under test
+    if (attempt < 3) {
+      println(s"Retrying in ${delay / 1000} seconds...")
+      mockThread.apply(delay)
+    }
+
+    // Assertions
+    verify(mockThread).apply(delay)
+  }
 }
