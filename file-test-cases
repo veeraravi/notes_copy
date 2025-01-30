@@ -161,7 +161,7 @@ test("ensureLocalPathExists should do nothing if directory already exists") {
     verify(mockFile).exists()
     verify(mockFile).mkdirs()
   }
-test("retryCopy should return true if attemptCopy succeeds on the first try") {
+ test("retryCopy should return true if attemptCopy succeeds on the first try") {
     // Mock dependencies
     val mockAttemptCopy = mock[Function2[String, String, Boolean]]
     val mockAttemptDelete = mock[Function1[String, Unit]]
@@ -287,7 +287,7 @@ test("retryCopy should return true if attemptCopy succeeds on the first try") {
     // Assertions
     assert(!success)
     verify(mockAttemptCopy, times(3)).apply(dummyHdfsSourcePath, dummyLocalDestPath)
-    verify(mockAttemptDelete, never()).apply(dummyHdfsSourcePath) // Should never delete since copy failed
+    verify(mockAttemptDelete, never()).apply(any[String]) // Fixed `never()` usage
     verify(mockRetryWithDelay, times(3)).apply(any[Int], any[Int]) // Should retry maxRetries times
   }
 
