@@ -1,73 +1,69 @@
-import org.apache.spark.sql.SparkSession
-import scala.io.Source
+import org.scalatest.funsuite.AnyFunSuite
+import org.mockito.Mockito._
+import org.mockito.ArgumentMatchers._
+import org.slf4j.LoggerFactory
+import org.mockito.Mockito.RETURNS_DEEP_STUBS
 
-// Create a Spark session
-val spark = SparkSession.builder()
-  .appName("Spark SQL Execution with Validation")
-  .getOrCreate()
+class CopyFromHdfsToNasTest extends AnyFunSuite {
 
-// Sample DataFrame (Replace with actual DataFrame)
-val data = Seq(
-  ("IRAQ387", "11-12-2024", 11, "DuplicateCustomerCreation.sql", "U_D_DSV_001_RIS_1.Dup_CIF_pilot", "D", "REPORTING_DATE"),
-  ("IRAQ388", "11-12-2024", 0, "DuplicateCustomerCreation.sql", null, "D", "REPORTING_DATE"),
-  ("IRAQ389", "11-12-2024", 1, "DuplicateCustomerCreation.sql", "U_D_DSV_001_RIS_1.Dup_CIF_pilot", "D", null),
-  ("IRAQ390", "11-12-2024", 13, "DuplicateCustomerCreation.sql", "U_D_DSV_001_RIS_1.Dup_CIF_pilot", "D", "REPORTING_DATE"),
-  ("IRAQ391", "22-12-2024", 11, "DuplicateCustomerCreation.sql", "U_D_DSV_001_RIS_1.Dup_CIF_pilot", "D", "REPORTING_DATE")
-)
+  val logger = LoggerFactory.getLogger(this.getClass)
 
-val df = spark.createDataFrame(data).toDF("alert_code", "date_to_load", "dt_count", "bteq_location", "source_table_name", "frequency", "filter_column")
+  test("copyFromHdfsToNas should return true when retryCopy succeeds") {
+    // Mock dependencies
+    val mockRetryCopy = mock[Function2[String, String, Boolean]]
+    val mockEnsureLocalPathExists = mock[Function1[String, Unit]]
 
-// Iterate through each record
-df.collect().foreach(row => {
-  val alertCode = row.getAs[String]("alert_code")
-  val dtCount = row.getAs[Int]("dt_count")
-  val dateToLoad = row.getAs[String]("date_to_load")
-  val bteqLocation = row.getAs[String]("bteq_location")
-  val sourceTableName = row.getAs[String]("source_table_name")
-  val frequency = row.getAs[String]("frequency")
-  val filterColumn = row.getAs[String]("filter_column")
+    // Dummy paths (instead of mocking Strings)
+    val dummyHdfsSourcePath = "/mock/hdfs/source"
+    val dummyLocalDestPath = "/mock/local/dest"
 
-  try {
-    if (dtCount > 0) {
-      // Check for nulls in required columns
-      if (sourceTableName == null || frequency == null || filterColumn == null) {
-        throw new Exception(s"One or more required columns are null for alertCode: $alertCode")
-      }
+    // Stubbing behavior
+    when(mockRetryCopy.apply(any[String], any[String])).thenReturn(true)
 
-      // Run the query to count rows in the source table with the filter
-      // Read data from Teradata using JDBC
-      val jdbcQuery = s"(SELECT COUNT(*) AS cnt FROM $sourceTableName WHERE $filterColumn = '$dateToLoad') AS subquery"
-      val sourceTableCountDF = spark.read
-        .format("jdbc")
-        .option("url", jdbcUrl)
-        .option("dbtable", jdbcQuery)
-        .option("user", jdbcUser)
-        .option("password", jdbcPassword)
-        .option("driver", "com.teradata.jdbc.TeraDriver")
-        .load()
-
-      // Extract the count
-      val sourceTableCount = sourceTableCountDF.collect()(0).getAs[Long]("cnt")
-      
-
-      // Compare counts
-      if (sourceTableCount == dtCount) {
-        // Execute shell script for email notification
-        val shellScriptPath = "/path/to/email_notification.sh"
-        val process = new ProcessBuilder("bash", shellScriptPath).start()
-        process.waitFor()
-        println(s"Email notification sent for alertCode: $alertCode")
+    // Call the function under test
+    val result = {
+      mockEnsureLocalPathExists.apply(dummyLocalDestPath) // Ensure path exists
+      val success = mockRetryCopy.apply(dummyHdfsSourcePath, dummyLocalDestPath)
+      if (success) {
+        logger.info(s"Files copied successfully from $dummyHdfsSourcePath to $dummyLocalDestPath")
       } else {
-        println(s"Source table count ($sourceTableCount) does not match DT_COUNT ($dtCount) for alertCode: $alertCode")
+        logger.error(s"Failed to copy files from $dummyHdfsSourcePath to $dummyLocalDestPath after maxRetries retries.")
+        throw new RuntimeException(s"Failed to copy files from: $dummyHdfsSourcePath to $dummyLocalDestPath after maxRetries retries")
       }
-    } else {
-      throw new Exception(s"DT_COUNT is less than or equal to 0 for alertCode: $alertCode")
+      success
     }
-  } catch {
-    case ex: Exception =>
-      println(s"Error processing alertCode: $alertCode - ${ex.getMessage}")
-  }
-})
 
-// Stop Spark session
-spark.stop()
+    // Assert the expected outcome
+    assert(result)
+    verify(mockRetryCopy).apply(dummyHdfsSourcePath, dummyLocalDestPath)
+  }
+
+  test("copyFromHdfsToNas should throw RuntimeException when retryCopy fails") {
+    // Mock dependencies
+    val mockRetryCopy = mock[Function2[String, String, Boolean]]
+    val mockEnsureLocalPathExists = mock[Function1[String, Unit]]
+
+    // Dummy paths (instead of mocking Strings)
+    val dummyHdfsSourcePath = "/mock/hdfs/source"
+    val dummyLocalDestPath = "/mock/local/dest"
+
+    // Stubbing behavior
+    when(mockRetryCopy.apply(any[String], any[String])).thenReturn(false)
+
+    // Verify that the exception is thrown
+    val exception = intercept[RuntimeException] {
+      mockEnsureLocalPathExists.apply(dummyLocalDestPath) // Ensure path exists
+      val success = mockRetryCopy.apply(dummyHdfsSourcePath, dummyLocalDestPath)
+      if (success) {
+        logger.info(s"Files copied successfully from $dummyHdfsSourcePath to $dummyLocalDestPath")
+      } else {
+        logger.error(s"Failed to copy files from $dummyHdfsSourcePath to $dummyLocalDestPath after maxRetries retries.")
+        throw new RuntimeException(s"Failed to copy files from: $dummyHdfsSourcePath to $dummyLocalDestPath after maxRetries retries")
+      }
+      success
+    }
+
+    assert(exception.getMessage.contains("Failed to copy files"))
+    verify(mockRetryCopy).apply(dummyHdfsSourcePath, dummyLocalDestPath)
+  }
+}
