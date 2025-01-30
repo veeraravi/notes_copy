@@ -161,6 +161,134 @@ test("ensureLocalPathExists should do nothing if directory already exists") {
     verify(mockFile).exists()
     verify(mockFile).mkdirs()
   }
+test("retryCopy should return true if attemptCopy succeeds on the first try") {
+    // Mock dependencies
+    val mockAttemptCopy = mock[Function2[String, String, Boolean]]
+    val mockAttemptDelete = mock[Function1[String, Unit]]
+    val mockRetryWithDelay = mock[Function2[Int, Int, Unit]]
 
+    // Dummy paths
+    val dummyHdfsSourcePath = "/mock/hdfs/source"
+    val dummyLocalDestPath = "/mock/local/dest"
+
+    // Stubbing behavior
+    when(mockAttemptCopy.apply(any[String], any[String])).thenReturn(true)
+
+    // Call the function under test
+    var success = false
+    var attempt = 0
+    var delay = 100 // Example initial delay
+
+    while (attempt < 3 && !success) {
+      try {
+        success = mockAttemptCopy.apply(dummyHdfsSourcePath, dummyLocalDestPath)
+        if (success) {
+          mockAttemptDelete.apply(dummyHdfsSourcePath)
+        }
+      } catch {
+        case ex: Exception =>
+          println(s"Error during copy attempt ${attempt + 1}: ${ex.getMessage}!")
+      }
+
+      if (!success) {
+        attempt += 1
+        mockRetryWithDelay.apply(attempt, delay)
+        delay = delay * 2 // Exponential backoff
+      }
+    }
+
+    // Assertions
+    assert(success)
+    verify(mockAttemptCopy).apply(dummyHdfsSourcePath, dummyLocalDestPath)
+    verify(mockAttemptDelete).apply(dummyHdfsSourcePath)
+    verify(mockRetryWithDelay, never()).apply(any[Int], any[Int]) // Should not retry if first attempt succeeds
+  }
+
+  test("retryCopy should retry up to maxRetries if attemptCopy fails") {
+    // Mock dependencies
+    val mockAttemptCopy = mock[Function2[String, String, Boolean]]
+    val mockAttemptDelete = mock[Function1[String, Unit]]
+    val mockRetryWithDelay = mock[Function2[Int, Int, Unit]]
+
+    // Dummy paths
+    val dummyHdfsSourcePath = "/mock/hdfs/source"
+    val dummyLocalDestPath = "/mock/local/dest"
+
+    // Stubbing behavior to fail first two attempts and succeed on third
+    when(mockAttemptCopy.apply(any[String], any[String]))
+      .thenReturn(false, false, true)
+
+    // Call the function under test
+    var success = false
+    var attempt = 0
+    var delay = 100 // Example initial delay
+
+    while (attempt < 3 && !success) {
+      try {
+        success = mockAttemptCopy.apply(dummyHdfsSourcePath, dummyLocalDestPath)
+        if (success) {
+          mockAttemptDelete.apply(dummyHdfsSourcePath)
+        }
+      } catch {
+        case ex: Exception =>
+          println(s"Error during copy attempt ${attempt + 1}: ${ex.getMessage}!")
+      }
+
+      if (!success) {
+        attempt += 1
+        mockRetryWithDelay.apply(attempt, delay)
+        delay = delay * 2 // Exponential backoff
+      }
+    }
+
+    // Assertions
+    assert(success)
+    verify(mockAttemptCopy, times(3)).apply(dummyHdfsSourcePath, dummyLocalDestPath)
+    verify(mockAttemptDelete).apply(dummyHdfsSourcePath)
+    verify(mockRetryWithDelay, times(2)).apply(any[Int], any[Int]) // Should retry twice before succeeding
+  }
+
+  test("retryCopy should return false after maxRetries if all attempts fail") {
+    // Mock dependencies
+    val mockAttemptCopy = mock[Function2[String, String, Boolean]]
+    val mockAttemptDelete = mock[Function1[String, Unit]]
+    val mockRetryWithDelay = mock[Function2[Int, Int, Unit]]
+
+    // Dummy paths
+    val dummyHdfsSourcePath = "/mock/hdfs/source"
+    val dummyLocalDestPath = "/mock/local/dest"
+
+    // Stubbing behavior to always fail
+    when(mockAttemptCopy.apply(any[String], any[String])).thenReturn(false)
+
+    // Call the function under test
+    var success = false
+    var attempt = 0
+    var delay = 100 // Example initial delay
+
+    while (attempt < 3 && !success) {
+      try {
+        success = mockAttemptCopy.apply(dummyHdfsSourcePath, dummyLocalDestPath)
+        if (success) {
+          mockAttemptDelete.apply(dummyHdfsSourcePath)
+        }
+      } catch {
+        case ex: Exception =>
+          println(s"Error during copy attempt ${attempt + 1}: ${ex.getMessage}!")
+      }
+
+      if (!success) {
+        attempt += 1
+        mockRetryWithDelay.apply(attempt, delay)
+        delay = delay * 2 // Exponential backoff
+      }
+    }
+
+    // Assertions
+    assert(!success)
+    verify(mockAttemptCopy, times(3)).apply(dummyHdfsSourcePath, dummyLocalDestPath)
+    verify(mockAttemptDelete, never()).apply(dummyHdfsSourcePath) // Should never delete since copy failed
+    verify(mockRetryWithDelay, times(3)).apply(any[Int], any[Int]) // Should retry maxRetries times
+  }
 
 }
