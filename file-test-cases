@@ -1,3 +1,58 @@
+test("ensureLocalPathExists should do nothing if directory already exists") {
+    // Mocking the File class
+    val mockFile = mock[File]
+    val dummyPath = "/mock/local/existing_dir"
+
+    // Stubbing behavior
+    when(mockFile.exists()).thenReturn(true)
+
+    // Call the actual function under test
+    ensureLocalPathExists(dummyPath)
+
+    // Verifications
+    verify(mockFile).exists()
+    verify(mockFile, never()).mkdirs() // Should not create the directory
+  }
+
+  test("ensureLocalPathExists should create directory if it does not exist") {
+    // Mocking the File class
+    val mockFile = mock[File]
+    val dummyPath = "/mock/local/new_dir"
+
+    // Stubbing behavior
+    when(mockFile.exists()).thenReturn(false)
+    when(mockFile.mkdirs()).thenReturn(true)
+
+    // Call the actual function under test
+    ensureLocalPathExists(dummyPath)
+
+    // Verifications
+    verify(mockFile).exists()
+    verify(mockFile).mkdirs()
+  }
+
+  test("ensureLocalPathExists should throw RuntimeException if directory creation fails") {
+    // Mocking the File class
+    val mockFile = mock[File]
+    val dummyPath = "/mock/local/failed_dir"
+
+    // Stubbing behavior
+    when(mockFile.exists()).thenReturn(false)
+    when(mockFile.mkdirs()).thenReturn(false)
+
+    // Verify that the exception is thrown
+    val exception = intercept[RuntimeException] {
+      ensureLocalPathExists(dummyPath)
+    }
+
+    assert(exception.getMessage.contains("Failed to create local directory"))
+    verify(mockFile).exists()
+    verify(mockFile).mkdirs()
+  }
+
+
+
+===========================================================
 import org.scalatest.funsuite.AnyFunSuite
 import org.mockito.Mockito._
 import org.mockito.ArgumentMatchers._
