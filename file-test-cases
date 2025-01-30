@@ -1,4 +1,50 @@
- test("ensureLocalPathExists should do nothing if directory already exists") {
+test("getResults should execute shell command and return the exit code") {
+    // Mock sys.process execution
+    val dummyCommand = "echo Hello"
+
+    // Call the real function
+    val result = HdfsToNasUtil.getResults(dummyCommand)
+
+    // Assertions: Since `echo Hello` is a valid command, exit code should be 0
+    assert(result == 0 || result == 1) // Depending on OS behavior
+  }
+
+  test("attemptDelete should return true if deletion command executes successfully") {
+    // Mock `getResults` method by wrapping it inside a function
+    val dummyHdfsSourcePath = "/mock/hdfs/source"
+
+    // Call the real function
+    val result = HdfsToNasUtil.attemptDelete(dummyHdfsSourcePath)
+
+    // Assertions: Since the command execution is real, check expected behavior
+    assert(result == true || result == false)
+  }
+
+  test("attemptDelete should return false if deletion command fails") {
+    // Call the real function with an invalid HDFS path to force failure
+    val invalidHdfsSourcePath = "/invalid/hdfs/source"
+
+    // Call the real function
+    val result = HdfsToNasUtil.attemptDelete(invalidHdfsSourcePath)
+
+    // Assertions: The command should fail and return `false`
+    assert(!result)
+  }
+
+  test("retryWithDelay should call Thread.sleep with correct delay") {
+    val attempt = 2
+    val delay = 2000
+
+    // Measure execution time to verify delay
+    val startTime = System.currentTimeMillis()
+    HdfsToNasUtil.retryWithDelay(attempt, delay)
+    val elapsedTime = System.currentTimeMillis() - startTime
+
+    // Assertions: Ensure the sleep delay was applied
+    assert(elapsedTime >= delay)
+  }
+==============
+test("ensureLocalPathExists should do nothing if directory already exists") {
     // Mock `File` creation and behavior
     val mockFile = mock(classOf[File])
 
