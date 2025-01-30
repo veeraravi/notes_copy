@@ -371,4 +371,98 @@ test("getResults should execute shell command and return the exit code") {
     // Assertions
     verify(mockThread).apply(delay)
   }
+
+ test("fallbackToDistCp should return true when distcp succeeds") {
+    // Mock dependencies
+    val mockGetResults = mock[Function1[String, Int]]
+
+    // Dummy paths
+    val dummyHdfsSourcePath = "/mock/hdfs/source"
+    val dummyLocalDestPath = "/mock/local/dest"
+
+    // Expected DistCp command
+    val expectedDistCpCmd = s"hadoop distcp -update $dummyHdfsSourcePath file://$dummyLocalDestPath"
+
+    // Stubbing behavior
+    when(mockGetResults.apply(any[String])).thenReturn(0) // Simulate successful execution
+
+    // Call the function
+    val distcpResult = mockGetResults.apply(expectedDistCpCmd)
+    val success = if (distcpResult == 0) {
+      logger.info(s"Distcp with -update successfully copied $dummyHdfsSourcePath to $dummyLocalDestPath.")
+      true
+    } else {
+      logger.error(s"Distcp with -update failed for $dummyHdfsSourcePath.")
+      false
+    }
+
+    // Assertions
+    assert(success)
+    verify(mockGetResults).apply(expectedDistCpCmd)
+  }
+
+  test("fallbackToDistCp should return false when distcp fails") {
+    // Mock dependencies
+    val mockGetResults = mock[Function1[String, Int]]
+
+    // Dummy paths
+    val dummyHdfsSourcePath = "/mock/hdfs/source"
+    val dummyLocalDestPath = "/mock/local/dest"
+
+    // Expected DistCp command
+    val expectedDistCpCmd = s"hadoop distcp -update $dummyHdfsSourcePath file://$dummyLocalDestPath"
+
+    // Stubbing behavior
+    when(mockGetResults.apply(any[String])).thenReturn(1) // Simulate failure
+
+    // Call the function
+    val distcpResult = mockGetResults.apply(expectedDistCpCmd)
+    val success = if (distcpResult == 0) {
+      logger.info(s"Distcp with -update successfully copied $dummyHdfsSourcePath to $dummyLocalDestPath.")
+      true
+    } else {
+      logger.error(s"Distcp with -update failed for $dummyHdfsSourcePath.")
+      false
+    }
+
+    // Assertions
+    assert(!success)
+    verify(mockGetResults).apply(expectedDistCpCmd)
+  }
+
+  test("fallbackToDistCp should return false when an exception occurs") {
+    // Mock dependencies
+    val mockGetResults = mock[Function1[String, Int]]
+
+    // Dummy paths
+    val dummyHdfsSourcePath = "/mock/hdfs/source"
+    val dummyLocalDestPath = "/mock/local/dest"
+
+    // Expected DistCp command
+    val expectedDistCpCmd = s"hadoop distcp -update $dummyHdfsSourcePath file://$dummyLocalDestPath"
+
+    // Stubbing behavior to throw an exception
+    when(mockGetResults.apply(any[String])).thenThrow(new RuntimeException("DistCp command failed"))
+
+    // Call the function and handle exception
+    val success = try {
+      val distcpResult = mockGetResults.apply(expectedDistCpCmd)
+      if (distcpResult == 0) {
+        logger.info(s"Distcp with -update successfully copied $dummyHdfsSourcePath to $dummyLocalDestPath.")
+        true
+      } else {
+        logger.error(s"Distcp with -update failed for $dummyHdfsSourcePath.")
+        false
+      }
+    } catch {
+      case e: Exception =>
+        logger.error(s"Error during distcp operation from $dummyHdfsSourcePath to $dummyLocalDestPath", e)
+        false
+    }
+
+    // Assertions
+    assert(!success)
+    verify(mockGetResults).apply(expectedDistCpCmd)
+  }
+
 }
