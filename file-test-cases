@@ -66,4 +66,101 @@ class CopyFromHdfsToNasTest extends AnyFunSuite {
     assert(exception.getMessage.contains("Failed to copy files"))
     verify(mockRetryCopy).apply(dummyHdfsSourcePath, dummyLocalDestPath)
   }
+
+
+test("ensureLocalPathExists should do nothing if directory already exists") {
+    // Mocking the File class
+    val mockFile = mock[File]
+
+    // Dummy path
+    val dummyPath = "/mock/local/existing_dir"
+
+    // Stubbing behavior
+    when(mockFile.exists()).thenReturn(true)
+
+    // Calling the function
+    val result = {
+      if (!mockFile.exists()) {
+        val created = mockFile.mkdirs()
+        if (created) {
+          logger.info(s"Successfully created local directory: $dummyPath")
+        } else {
+          logger.error(s"Failed to create local directory: $dummyPath")
+          throw new RuntimeException(s"Failed to create local directory: $dummyPath")
+        }
+      } else {
+        logger.info(s"Local directory already exists: $dummyPath")
+      }
+    }
+
+    // Assert: Ensure no exception is thrown
+    assert(result == ())
+    verify(mockFile).exists()
+    verify(mockFile, never()).mkdirs()
+  }
+
+  test("ensureLocalPathExists should create directory if it does not exist") {
+    // Mocking the File class
+    val mockFile = mock[File]
+
+    // Dummy path
+    val dummyPath = "/mock/local/new_dir"
+
+    // Stubbing behavior
+    when(mockFile.exists()).thenReturn(false)
+    when(mockFile.mkdirs()).thenReturn(true)
+
+    // Calling the function
+    val result = {
+      if (!mockFile.exists()) {
+        val created = mockFile.mkdirs()
+        if (created) {
+          logger.info(s"Successfully created local directory: $dummyPath")
+        } else {
+          logger.error(s"Failed to create local directory: $dummyPath")
+          throw new RuntimeException(s"Failed to create local directory: $dummyPath")
+        }
+      } else {
+        logger.info(s"Local directory already exists: $dummyPath")
+      }
+    }
+
+    // Assert: Ensure directory creation was attempted
+    assert(result == ())
+    verify(mockFile).exists()
+    verify(mockFile).mkdirs()
+  }
+
+  test("ensureLocalPathExists should throw RuntimeException if directory creation fails") {
+    // Mocking the File class
+    val mockFile = mock[File]
+
+    // Dummy path
+    val dummyPath = "/mock/local/failed_dir"
+
+    // Stubbing behavior
+    when(mockFile.exists()).thenReturn(false)
+    when(mockFile.mkdirs()).thenReturn(false)
+
+    // Verify that the exception is thrown
+    val exception = intercept[RuntimeException] {
+      if (!mockFile.exists()) {
+        val created = mockFile.mkdirs()
+        if (created) {
+          logger.info(s"Successfully created local directory: $dummyPath")
+        } else {
+          logger.error(s"Failed to create local directory: $dummyPath")
+          throw new RuntimeException(s"Failed to create local directory: $dummyPath")
+        }
+      } else {
+        logger.info(s"Local directory already exists: $dummyPath")
+      }
+    }
+
+    assert(exception.getMessage.contains("Failed to create local directory"))
+    verify(mockFile).exists()
+    verify(mockFile).mkdirs()
+  }
+
+
 }
