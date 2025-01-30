@@ -1,13 +1,12 @@
-test("ensureLocalPathExists should do nothing if directory already exists") {
-    // Mocking the File class
-    val mockFile = mock[File]
-    val dummyPath = "/mock/local/existing_dir"
+ test("ensureLocalPathExists should do nothing if directory already exists") {
+    // Mock `File` creation and behavior
+    val mockFile = mock(classOf[File])
 
-    // Stubbing behavior
+    // Stub `exists()` to return `true`
     when(mockFile.exists()).thenReturn(true)
 
-    // Call the actual function under test
-    ensureLocalPathExists(dummyPath)
+    // Call the real function
+    ensureLocalPathExists("/mock/local/existing_dir")
 
     // Verifications
     verify(mockFile).exists()
@@ -15,39 +14,37 @@ test("ensureLocalPathExists should do nothing if directory already exists") {
   }
 
   test("ensureLocalPathExists should create directory if it does not exist") {
-    // Mocking the File class
-    val mockFile = mock[File]
-    val dummyPath = "/mock/local/new_dir"
+    // Mock `File` creation and behavior
+    val mockFile = mock(classOf[File])
 
-    // Stubbing behavior
+    // Stub `exists()` to return `false` and `mkdirs()` to return `true`
     when(mockFile.exists()).thenReturn(false)
     when(mockFile.mkdirs()).thenReturn(true)
 
-    // Call the actual function under test
-    ensureLocalPathExists(dummyPath)
+    // Call the real function
+    ensureLocalPathExists("/mock/local/new_dir")
 
     // Verifications
     verify(mockFile).exists()
-    verify(mockFile).mkdirs()
+    verify(mockFile).mkdirs() // Directory should be created
   }
 
   test("ensureLocalPathExists should throw RuntimeException if directory creation fails") {
-    // Mocking the File class
-    val mockFile = mock[File]
-    val dummyPath = "/mock/local/failed_dir"
+    // Mock `File` creation and behavior
+    val mockFile = mock(classOf[File])
 
-    // Stubbing behavior
+    // Stub `exists()` to return `false` and `mkdirs()` to return `false`
     when(mockFile.exists()).thenReturn(false)
     when(mockFile.mkdirs()).thenReturn(false)
 
-    // Verify that the exception is thrown
+    // Verify that the exception is thrown when calling the real function
     val exception = intercept[RuntimeException] {
-      ensureLocalPathExists(dummyPath)
+      ensureLocalPathExists("/mock/local/failed_dir")
     }
 
     assert(exception.getMessage.contains("Failed to create local directory"))
     verify(mockFile).exists()
-    verify(mockFile).mkdirs()
+    verify(mockFile).mkdirs() // Directory creation should be attempted
   }
 
 
