@@ -13,29 +13,29 @@ class CopyFromHdfsToNasTest extends AnyFunSuite {
     val mockRetryCopy = mock[Function2[String, String, Boolean]]
     val mockEnsureLocalPathExists = mock[Function1[String, Unit]]
 
-    // Mocking HDFS and Local destination paths
-    val mockHdfsSourcePath = mock[String]
-    val mockLocalDestPath = mock[String]
+    // Dummy paths (instead of mocking Strings)
+    val dummyHdfsSourcePath = "/mock/hdfs/source"
+    val dummyLocalDestPath = "/mock/local/dest"
 
     // Stubbing behavior
     when(mockRetryCopy.apply(any[String], any[String])).thenReturn(true)
 
     // Call the function under test
     val result = {
-      val ensureLocalPathExists = mockEnsureLocalPathExists.apply(mockLocalDestPath)
-      val success = mockRetryCopy.apply(mockHdfsSourcePath, mockLocalDestPath)
+      mockEnsureLocalPathExists.apply(dummyLocalDestPath) // Ensure path exists
+      val success = mockRetryCopy.apply(dummyHdfsSourcePath, dummyLocalDestPath)
       if (success) {
-        logger.info(s"Files copied successfully from $mockHdfsSourcePath to $mockLocalDestPath")
+        logger.info(s"Files copied successfully from $dummyHdfsSourcePath to $dummyLocalDestPath")
       } else {
-        logger.error(s"Failed to copy files from $mockHdfsSourcePath to $mockLocalDestPath after maxRetries retries.")
-        throw new RuntimeException(s"Failed to copy files from: $mockHdfsSourcePath to $mockLocalDestPath after maxRetries retries")
+        logger.error(s"Failed to copy files from $dummyHdfsSourcePath to $dummyLocalDestPath after maxRetries retries.")
+        throw new RuntimeException(s"Failed to copy files from: $dummyHdfsSourcePath to $dummyLocalDestPath after maxRetries retries")
       }
       success
     }
 
     // Assert the expected outcome
     assert(result)
-    verify(mockRetryCopy).apply(mockHdfsSourcePath, mockLocalDestPath)
+    verify(mockRetryCopy).apply(dummyHdfsSourcePath, dummyLocalDestPath)
   }
 
   test("copyFromHdfsToNas should throw RuntimeException when retryCopy fails") {
@@ -43,27 +43,27 @@ class CopyFromHdfsToNasTest extends AnyFunSuite {
     val mockRetryCopy = mock[Function2[String, String, Boolean]]
     val mockEnsureLocalPathExists = mock[Function1[String, Unit]]
 
-    // Mocking HDFS and Local destination paths
-    val mockHdfsSourcePath = mock[String]
-    val mockLocalDestPath = mock[String]
+    // Dummy paths (instead of mocking Strings)
+    val dummyHdfsSourcePath = "/mock/hdfs/source"
+    val dummyLocalDestPath = "/mock/local/dest"
 
     // Stubbing behavior
     when(mockRetryCopy.apply(any[String], any[String])).thenReturn(false)
 
     // Verify that the exception is thrown
     val exception = intercept[RuntimeException] {
-      val ensureLocalPathExists = mockEnsureLocalPathExists.apply(mockLocalDestPath)
-      val success = mockRetryCopy.apply(mockHdfsSourcePath, mockLocalDestPath)
+      mockEnsureLocalPathExists.apply(dummyLocalDestPath) // Ensure path exists
+      val success = mockRetryCopy.apply(dummyHdfsSourcePath, dummyLocalDestPath)
       if (success) {
-        logger.info(s"Files copied successfully from $mockHdfsSourcePath to $mockLocalDestPath")
+        logger.info(s"Files copied successfully from $dummyHdfsSourcePath to $dummyLocalDestPath")
       } else {
-        logger.error(s"Failed to copy files from $mockHdfsSourcePath to $mockLocalDestPath after maxRetries retries.")
-        throw new RuntimeException(s"Failed to copy files from: $mockHdfsSourcePath to $mockLocalDestPath after maxRetries retries")
+        logger.error(s"Failed to copy files from $dummyHdfsSourcePath to $dummyLocalDestPath after maxRetries retries.")
+        throw new RuntimeException(s"Failed to copy files from: $dummyHdfsSourcePath to $dummyLocalDestPath after maxRetries retries")
       }
       success
     }
 
     assert(exception.getMessage.contains("Failed to copy files"))
-    verify(mockRetryCopy).apply(mockHdfsSourcePath, mockLocalDestPath)
+    verify(mockRetryCopy).apply(dummyHdfsSourcePath, dummyLocalDestPath)
   }
 }
