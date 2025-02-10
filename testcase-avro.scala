@@ -1,3 +1,90 @@
+
+import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.functions._
+import org.apache.spark.rdd.RDD
+import org.mockito.Mockito._
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatestplus.mockito.MockitoSugar
+import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.avro.generic.GenericRecord
+import org.mockito.ArgumentMatchers._
+
+class GetValidAvroMessagesTest extends AnyFunSuite with MockitoSugar {
+
+  test("getValidAvroMessages should process messages correctly with schema registry") {
+    // Mock SparkSession
+    val spark = mock[SparkSession]
+
+    // Mock input arguments
+    val args: List[Any] = List("schemaPath", "registryURL", "badRecordLoc", "consumerGroup", "datacenter", "false")
+
+    // Mock RDD
+    val messagesRDD = mock[RDD[ConsumerRecord[String, GenericRecord]]]
+
+    // Mock DataFrame
+    val dfMock = mock[DataFrame]
+
+    // Mock getDataFrameFromMessageRdd
+    object MockUtils {
+      def getDataFrameFromMessageRdd(spark: SparkSession, rdd: RDD[ConsumerRecord[String, GenericRecord]]): DataFrame = dfMock
+      def getSchemaFromSchemaRegistry(url: String, topic: String): String = """{"type":"record","name":"TestSchema"}"""
+      def writeBadRecords(df: DataFrame, path: String): Unit = {} // Mock as empty method
+    }
+
+    // Mock method calls inside the function
+    when(MockUtils.getDataFrameFromMessageRdd(spark, messagesRDD)).thenReturn(dfMock)
+    when(MockUtils.getSchemaFromSchemaRegistry(any[String], any[String])).thenReturn("""{"type":"record","name":"TestSchema"}""")
+
+    when(dfMock.withColumn(any[String], any())).thenReturn(dfMock)
+    when(dfMock.select(any())).thenReturn(dfMock)
+
+    // Call function under test
+    val result = getValidAvroMessages(spark, "inputTopic", messagesRDD, args)
+
+    // Assertions
+    assert(result != null)
+    verify(dfMock, atLeastOnce()).withColumn(any[String], any())
+  }
+
+  test("getValidAvroMessages should handle missing schema registry URL gracefully") {
+    val spark = mock[SparkSession]
+    val args: List[Any] = List("schemaPath", "", "badRecordLoc", "consumerGroup", "datacenter", "false")
+    val messagesRDD = mock[RDD[ConsumerRecord[String, GenericRecord]]]
+    val dfMock = mock[DataFrame]
+
+    when(dfMock.withColumn(any[String], any())).thenReturn(dfMock)
+    when(dfMock.select(any())).thenReturn(dfMock)
+
+    val result = getValidAvroMessages(spark, "inputTopic", messagesRDD, args)
+
+    assert(result != null)
+    verify(dfMock, never()).withColumn("parsed_json", from_json(col("value"), any()))
+  }
+
+  test("getValidAvroMessages should write bad records if enabled") {
+    val spark = mock[SparkSession]
+    val args: List[Any] = List("schemaPath", "registryURL", "badRecordLoc", "consumerGroup", "datacenter", "true")
+    val messagesRDD = mock[RDD[ConsumerRecord[String, GenericRecord]]]
+    val dfMock = mock[DataFrame]
+
+    when(dfMock.withColumn(any[String], any())).thenReturn(dfMock)
+    when(dfMock.select(any())).thenReturn(dfMock)
+
+    // Mock writeBadRecords
+    doNothing().when(MockUtils).writeBadRecords(dfMock, "badRecordLoc")
+
+    val result = getValidAvroMessages(spark, "inputTopic", messagesRDD, args)
+
+    assert(result != null)
+    verify(dfMock, atLeastOnce()).withColumn(any[String], any())
+    verify(MockUtils, atLeastOnce()).writeBadRecords(dfMock, "badRecordLoc")
+  }
+}
+
+
+
+
+=======================================
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions._
 import org.apache.spark.rdd.RDD
