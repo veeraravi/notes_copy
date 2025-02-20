@@ -1,3 +1,23 @@
+
+
+sealed trait KafkaMessage
+case class AvroMessage(key: String, value: GenericRecord) extends KafkaMessage
+case class StringMessage(key: String, value: String) extends KafkaMessage
+
+def getMessageRDD(sc: SparkContext, sourcePayloadFormat: String, kafkaParams: util.Map[String, Object]): RDD[KafkaMessage] = {
+    sourcePayloadFormat.toLowerCase() match {
+        case "avro" =>
+            val messagesRDD = KafkaUtils.createRDD[String, GenericRecord](sc, kafkaParams, offsetRanges, PreferConsistent)
+            messagesRDD.map { case (key, value) => AvroMessage(key, value) }
+
+        case _ =>
+            val messagesRDD = KafkaUtils.createRDD[String, String](sc, kafkaParams, offsetRanges, PreferConsistent)
+            messagesRDD.map { case (key, value) => StringMessage(key, value) }
+    }
+}
+
+
+==============================================
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import min
 
