@@ -3,10 +3,15 @@ import com.google.cloud.bigquery.{Field, StandardSQLTypeName, Schema}
 import org.apache.spark.sql.types._
 import scala.jdk.CollectionConverters._
 
+import com.google.cloud.bigquery.{Field, StandardSQLTypeName, Schema}
+import org.apache.spark.sql.types._
+import scala.jdk.CollectionConverters._
+
 def convertToBigQueryField(field: StructField): Field = {
   val mode = if (field.nullable) Field.Mode.NULLABLE else Field.Mode.REQUIRED
 
   field.dataType match {
+    // Primitive Types
     case IntegerType | LongType =>
       Field.newBuilder(field.name, StandardSQLTypeName.INT64).setMode(mode).build()
 
@@ -31,33 +36,26 @@ def convertToBigQueryField(field: StructField): Field = {
       else
         Field.newBuilder(field.name, StandardSQLTypeName.STRING).setMode(mode).build()
 
+    // ArrayType: build array with element type
     case ArrayType(elementType, _) =>
-      // Recursively get field for element type
       val elementField = convertToBigQueryField(StructField(field.name + "_element", elementType))
-      Field.newBuilder(field.name, Field.Type.array(elementField.getType)).setMode(mode).build()
+      Field.newBuilder(field.name, elementField.getType).setMode(Field.Mode.REPEATED).build()
 
+    // StructType: build nested struct
     case StructType(fields) =>
       val subFields = fields.map(convertToBigQueryField).toList.asJava
       Field.newBuilder(field.name, Field.Type.record(subFields)).setMode(mode).build()
 
+    // MapType: must be converted in DataFrame before reaching here
     case MapType(keyType, valueType, _) =>
-      if (keyType != StringType)
-        throw new IllegalArgumentException(s"Unsupported MapType with non-string key: $keyType. Convert it to ARRAY<STRUCT<key STRING, value TYPE>>")
+      throw new IllegalArgumentException(s"MapType is not supported directly: $field.name. Please convert it to Array<Struct<key, value>> before schema creation.")
 
-      valueType match {
-        case StringType | IntegerType | LongType | DoubleType | FloatType | BooleanType =>
-          // You are expected to pre-transform Map to Array<Struct<key, value>> in DataFrame
-          throw new IllegalArgumentException(s"Convert MapType manually in DataFrame before schema creation: $field")
-        case StructType(_) =>
-          throw new IllegalArgumentException(s"Unsupported MapType with complex value type: $valueType. Convert it to ARRAY<STRUCT<key, value>>")
-        case _ =>
-          throw new IllegalArgumentException(s"Unsupported MapType: $field")
-      }
-
+    // Fallback
     case _ =>
       Field.newBuilder(field.name, StandardSQLTypeName.STRING).setMode(mode).build()
   }
 }
+
 
 
 
