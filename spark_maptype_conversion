@@ -3,15 +3,11 @@ import com.google.cloud.bigquery.{Field, StandardSQLTypeName, Schema}
 import org.apache.spark.sql.types._
 import scala.jdk.CollectionConverters._
 
-import com.google.cloud.bigquery.{Field, StandardSQLTypeName, Schema}
-import org.apache.spark.sql.types._
-import scala.jdk.CollectionConverters._
-
 def convertToBigQueryField(field: StructField): Field = {
   val mode = if (field.nullable) Field.Mode.NULLABLE else Field.Mode.REQUIRED
 
   field.dataType match {
-    // Primitive Types
+    // Primitive types
     case IntegerType | LongType =>
       Field.newBuilder(field.name, StandardSQLTypeName.INT64).setMode(mode).build()
 
@@ -36,19 +32,27 @@ def convertToBigQueryField(field: StructField): Field = {
       else
         Field.newBuilder(field.name, StandardSQLTypeName.STRING).setMode(mode).build()
 
-    // ArrayType: build array with element type
-    case ArrayType(elementType, _) =>
-      val elementField = convertToBigQueryField(StructField(field.name + "_element", elementType))
-      Field.newBuilder(field.name, elementField.getType).setMode(Field.Mode.REPEATED).build()
-
-    // StructType: build nested struct
+    // StructType
     case StructType(fields) =>
       val subFields = fields.map(convertToBigQueryField).toList.asJava
-      Field.newBuilder(field.name, Field.Type.record(subFields)).setMode(mode).build()
+      Field.newBuilder(field.name, StandardSQLTypeName.STRUCT)
+        .setMode(mode)
+        .setSubFields(subFields)
+        .build()
 
-    // MapType: must be converted in DataFrame before reaching here
-    case MapType(keyType, valueType, _) =>
-      throw new IllegalArgumentException(s"MapType is not supported directly: $field.name. Please convert it to Array<Struct<key, value>> before schema creation.")
+    // ArrayType
+    case ArrayType(elementType, _) =>
+      val elementField = convertToBigQueryField(StructField(field.name + "_element", elementType, nullable = true))
+      Field.newBuilder(field.name, elementField.getType)
+        .setMode(Field.Mode.REPEATED)
+        .setSubFields(elementField.getSubFields) // Required if it's an array of structs
+        .build()
+
+    // MapType
+    case MapType(_, _, _) =>
+      throw new IllegalArgumentException(
+        s"MapType is not supported directly: ${field.name}. Please convert it to Array<Struct<key, value>> before schema generation."
+      )
 
     // Fallback
     case _ =>
