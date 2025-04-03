@@ -1,3 +1,47 @@
+def convertToBigQueryField(field: StructField): Field = {
+  val fieldType = field.dataType match {
+    case IntegerType | LongType =>
+      StandardSQLTypeName.INT64
+    case DoubleType | FloatType =>
+      StandardSQLTypeName.FLOAT64
+    case StringType =>
+      StandardSQLTypeName.STRING
+    case BooleanType =>
+      StandardSQLTypeName.BOOL
+    case TimestampType =>
+      StandardSQLTypeName.TIMESTAMP
+    case DateType =>
+      StandardSQLTypeName.DATE
+    case d: DecimalType =>
+      if (d.precision <= 38 && d.scale <= 9) StandardSQLTypeName.NUMERIC
+      else StandardSQLTypeName.STRING
+    case ArrayType(elementType, _) =>
+      val elementField = convertToBigQueryField(StructField(field.name, elementType))
+      Field.newBuilder(field.name, StandardSQLTypeName.ARRAY, elementField.getSubFields)
+          .setMode(if (field.nullable) Field.Mode.NULLABLE else Field.Mode.REQUIRED)
+          .build()
+    case StructType(fields) =>
+      val subFields = fields.map(convertToBigQueryField).toList.asJava
+      Field.newBuilder(field.name, StandardSQLTypeName.STRUCT, subFields)
+          .setMode(if (field.nullable) Field.Mode.NULLABLE else Field.Mode.REQUIRED)
+          .build()
+    case _ =>
+      StandardSQLTypeName.STRING
+  }
+
+  if (!field.dataType.isInstanceOf[ArrayType] && !field.dataType.isInstanceOf[StructType]) {
+    Field.newBuilder(field.name, fieldType)
+      .setMode(if (field.nullable) Field.Mode.NULLABLE else Field.Mode.REQUIRED)
+      .build()
+  } else {
+    // Already built above
+    null
+  }
+}
+
+==========================================
+
+
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 
