@@ -1,3 +1,70 @@
+
+import com.google.cloud.bigquery.{Field, StandardSQLTypeName, Schema}
+import org.apache.spark.sql.types._
+import scala.jdk.CollectionConverters._
+
+def convertToBigQueryField(field: StructField): Field = {
+  val mode = if (field.nullable) Field.Mode.NULLABLE else Field.Mode.REQUIRED
+
+  field.dataType match {
+    case IntegerType | LongType =>
+      Field.newBuilder(field.name, StandardSQLTypeName.INT64).setMode(mode).build()
+
+    case DoubleType | FloatType =>
+      Field.newBuilder(field.name, StandardSQLTypeName.FLOAT64).setMode(mode).build()
+
+    case StringType =>
+      Field.newBuilder(field.name, StandardSQLTypeName.STRING).setMode(mode).build()
+
+    case BooleanType =>
+      Field.newBuilder(field.name, StandardSQLTypeName.BOOL).setMode(mode).build()
+
+    case TimestampType =>
+      Field.newBuilder(field.name, StandardSQLTypeName.TIMESTAMP).setMode(mode).build()
+
+    case DateType =>
+      Field.newBuilder(field.name, StandardSQLTypeName.DATE).setMode(mode).build()
+
+    case d: DecimalType =>
+      if (d.precision <= 38 && d.scale <= 9)
+        Field.newBuilder(field.name, StandardSQLTypeName.NUMERIC).setMode(mode).build()
+      else
+        Field.newBuilder(field.name, StandardSQLTypeName.STRING).setMode(mode).build()
+
+    case ArrayType(elementType, _) =>
+      // Recursively get field for element type
+      val elementField = convertToBigQueryField(StructField(field.name + "_element", elementType))
+      Field.newBuilder(field.name, Field.Type.array(elementField.getType)).setMode(mode).build()
+
+    case StructType(fields) =>
+      val subFields = fields.map(convertToBigQueryField).toList.asJava
+      Field.newBuilder(field.name, Field.Type.record(subFields)).setMode(mode).build()
+
+    case MapType(keyType, valueType, _) =>
+      if (keyType != StringType)
+        throw new IllegalArgumentException(s"Unsupported MapType with non-string key: $keyType. Convert it to ARRAY<STRUCT<key STRING, value TYPE>>")
+
+      valueType match {
+        case StringType | IntegerType | LongType | DoubleType | FloatType | BooleanType =>
+          // You are expected to pre-transform Map to Array<Struct<key, value>> in DataFrame
+          throw new IllegalArgumentException(s"Convert MapType manually in DataFrame before schema creation: $field")
+        case StructType(_) =>
+          throw new IllegalArgumentException(s"Unsupported MapType with complex value type: $valueType. Convert it to ARRAY<STRUCT<key, value>>")
+        case _ =>
+          throw new IllegalArgumentException(s"Unsupported MapType: $field")
+      }
+
+    case _ =>
+      Field.newBuilder(field.name, StandardSQLTypeName.STRING).setMode(mode).build()
+  }
+}
+
+
+
+
+
+
+---------------------------------------------
 def convertToBigQueryField(field: StructField): Field = {
   val fieldType = field.dataType match {
     case IntegerType | LongType =>
