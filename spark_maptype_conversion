@@ -1,4 +1,23 @@
 
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.DataFrame
+
+val mapToJson: DataFrame => DataFrame = df => {
+  val updatedCols = df.schema.fields.map { field =>
+    field.dataType match {
+      case MapType(_, _, _) =>
+        // Convert any map to JSON string
+        to_json(col(field.name)).alias(field.name)
+      case _ =>
+        col(field.name)
+    }
+  }
+  df.select(updatedCols: _*)
+}
+
+
+
 import com.google.cloud.bigquery.{Field, StandardSQLTypeName, Schema}
 import org.apache.spark.sql.types._
 import scala.jdk.CollectionConverters._
