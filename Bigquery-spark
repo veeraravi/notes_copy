@@ -1,0 +1,75 @@
+import org.apache.spark.sql.SparkSession
+import com.google.cloud.bigquery._
+import java.time.Instant
+import java.time.temporal.ChronoUnit
+
+object SparkBQWriteValidator {
+
+  def main(args: Array[String]): Unit = {
+    val spark = SparkSession.builder()
+      .appName("SparkBQValidation")
+      .getOrCreate()
+
+    import spark.implicits._
+
+    // 1. Create DataFrame (example)
+    val df = Seq((1, "foo"), (2, "bar")).toDF("id", "value")
+
+    // 2. Write to BigQuery
+    val projectId = "your-project-id"
+    val dataset = "your_dataset"
+    val table = "temp_table"
+    val fullTableId = s"$projectId.$dataset.$table"
+
+    df.write
+      .format("bigquery")
+      .option("table", fullTableId)
+      .mode("overwrite")
+      .save()
+
+    // 3. Wait for write to register
+    Thread.sleep(5000)
+
+    // 4. BigQuery client to check job status
+    val bigQuery = BigQueryOptions.getDefaultInstance.getService
+
+    val cutoff = Instant.now().minus(5, ChronoUnit.MINUTES)
+    val jobIterator = bigQuery.listJobs(BigQuery.JobListOption.minCreationTime(cutoff.toEpochMilli)).iterateAll().iterator()
+
+    var jobValidated = false
+    while (jobIterator.hasNext && !jobValidated) {
+      val job = jobIterator.next()
+
+      if (job.getJobConfiguration.getType == JobConfiguration.Type.LOAD &&
+          job.getStatus.getError == null &&
+          Option(job.getDestinationTable).exists(_.getTable == table)) {
+
+        println(s"✅ BigQuery write job succeeded: ${job.getJobId}")
+        jobValidated = true
+      } else if (Option(job.getDestinationTable).exists(_.getTable == table)) {
+        val error = job.getStatus.getError
+        println(s"❌ BigQuery write job failed: ${job.getJobId}")
+        println(s"Reason: ${error.getReason}, Message: ${error.getMessage}")
+        throw new RuntimeException(s"BigQuery write failed: ${error.getMessage}")
+      }
+    }
+
+    if (!jobValidated) {
+      println("⚠️ No matching BigQuery job found to validate.")
+    }
+
+    // 5. Validate row count
+    val tableId = TableId.of(dataset, table)
+    val bqTable = bigQuery.getTable(tableId)
+    val bqRowCount = bqTable.getNumRows
+    val sparkRowCount = df.count()
+
+    if (sparkRowCount != bqRowCount) {
+      throw new RuntimeException(s"Row count mismatch: Spark=$sparkRowCount, BQ=$bqRowCount")
+    } else {
+      println(s"✅ Row count validated: $sparkRowCount rows")
+    }
+
+    spark.stop()
+  }
+}
