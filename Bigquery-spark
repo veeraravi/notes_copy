@@ -2,6 +2,88 @@ import org.apache.spark.sql.SparkSession
 import com.google.cloud.bigquery._
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import java.util.UUID
+
+object SparkBQWriteSafe {
+
+  def main(args: Array[String]): Unit = {
+    val spark = SparkSession.builder()
+      .appName("SafeBQWrite")
+      .getOrCreate()
+
+    import spark.implicits._
+
+    val df = Seq((1, "a"), (2, "b")).toDF("id", "value")
+
+    val projectId = "your-project-id"
+    val dataset = "your_dataset"
+
+    // Use timestamp + UUID to generate a unique table name
+    val tableSuffix = Instant.now().getEpochSecond.toString + "_" + UUID.randomUUID().toString.replace("-", "")
+    val table = s"temp_table_$tableSuffix"
+    val fullTableId = s"$projectId.$dataset.$table"
+
+    println(s"📝 Writing to table: $fullTableId")
+
+    // Write
+    df.write
+      .format("bigquery")
+      .option("table", fullTableId)
+      .mode("overwrite")
+      .save()
+
+    // Wait for job registration
+    Thread.sleep(5000)
+
+    // Use BQ client to find job for this exact table
+    val bigQuery = BigQueryOptions.getDefaultInstance.getService
+    val cutoff = Instant.now().minus(5, ChronoUnit.MINUTES)
+    val jobs = bigQuery.listJobs(BigQuery.JobListOption.minCreationTime(cutoff.toEpochMilli))
+
+    var matched = false
+    val jobIterator = jobs.iterateAll().iterator()
+    while (jobIterator.hasNext && !matched) {
+      val job = jobIterator.next()
+      val dest = job.getDestinationTable
+      if (dest != null && dest.getTable.equals(table) && dest.getDataset.equals(dataset)) {
+        matched = true
+        if (job.getStatus.getError != null) {
+          val error = job.getStatus.getError
+          println(s"❌ Job failed: ${job.getJobId} - ${error.getMessage}")
+          throw new RuntimeException("BigQuery job failed: " + error.getMessage)
+        } else {
+          println(s"✅ Job succeeded: ${job.getJobId}")
+        }
+      }
+    }
+
+    if (!matched) {
+      throw new RuntimeException("No matching BigQuery job found for table: " + table)
+    }
+
+    // Validate row count
+    val tableId = TableId.of(dataset, table)
+    val bqTable = bigQuery.getTable(tableId)
+    val bqRowCount = bqTable.getNumRows
+    val sparkRowCount = df.count()
+
+    if (sparkRowCount != bqRowCount) {
+      throw new RuntimeException(s"❌ Row count mismatch: Spark=$sparkRowCount, BQ=$bqRowCount")
+    } else {
+      println(s"✅ Row count validated: $sparkRowCount rows")
+    }
+
+    spark.stop()
+  }
+}
+
+
+
+
+import org.apache.spark.sql.SparkSession
+import com.google.cloud.bigquery._
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 
 object SparkBQWriteValidator {
 
