@@ -1,3 +1,145 @@
+Below are code examples for using .option() with spark.read for each supported format in Apache Spark:
+
+⸻
+
+✅ 1. CSV Format
+
+df = spark.read.format("csv") \
+    .option("header", "true") \
+    .option("inferSchema", "true") \
+    .option("delimiter", ",") \
+    .option("quote", "\"") \
+    .option("escape", "\\") \
+    .option("multiLine", "true") \
+    .option("encoding", "UTF-8") \
+    .option("nullValue", "NA") \
+    .option("dateFormat", "yyyy-MM-dd") \
+    .option("timestampFormat", "yyyy-MM-dd HH:mm:ss") \
+    .option("mode", "PERMISSIVE") \
+    .option("comment", "#") \
+    .option("ignoreLeadingWhiteSpace", "true") \
+    .option("ignoreTrailingWhiteSpace", "true") \
+    .load("s3a://my-bucket/data.csv")
+
+
+⸻
+
+✅ 2. Parquet Format
+
+df = spark.read.format("parquet") \
+    .option("mergeSchema", "true") \
+    .option("pathGlobFilter", "*.parquet") \
+    .option("recursiveFileLookup", "true") \
+    .option("datetimeRebaseMode", "CORRECTED") \
+    .load("s3a://my-bucket/parquet-data/")
+
+
+⸻
+
+✅ 3. JSON Format
+
+df = spark.read.format("json") \
+    .option("multiLine", "true") \
+    .option("primitivesAsString", "false") \
+    .option("allowComments", "true") \
+    .option("allowUnquotedFieldNames", "true") \
+    .option("mode", "PERMISSIVE") \
+    .option("columnNameOfCorruptRecord", "_corrupt") \
+    .option("encoding", "UTF-8") \
+    .option("dateFormat", "yyyy-MM-dd") \
+    .option("timestampFormat", "yyyy-MM-dd'T'HH:mm:ss") \
+    .option("dropFieldIfAllNull", "true") \
+    .load("s3a://my-bucket/data.json")
+
+
+⸻
+
+✅ 4. Avro Format
+
+df = spark.read.format("avro") \
+    .option("avroSchema", '{"type":"record","name":"User","fields":[{"name":"name","type":"string"}]}') \
+    .option("recordName", "User") \
+    .option("recordNamespace", "com.example") \
+    .option("compression", "snappy") \
+    .option("ignoreExtension", "false") \
+    .load("s3a://my-bucket/avro-data/")
+
+
+⸻
+
+✅ 5. JDBC Format (e.g., PostgreSQL)
+
+df = spark.read.format("jdbc") \
+    .option("url", "jdbc:postgresql://host:5432/mydb") \
+    .option("dbtable", "public.customers") \
+    .option("user", "myuser") \
+    .option("password", "mypassword") \
+    .option("driver", "org.postgresql.Driver") \
+    .option("fetchsize", "1000") \
+    .option("partitionColumn", "customer_id") \
+    .option("lowerBound", "1") \
+    .option("upperBound", "100000") \
+    .option("numPartitions", "4") \
+    .option("sessionInitStatement", "SET search_path TO my_schema") \
+    .option("pushDownPredicate", "true") \
+    .load()
+
+
+⸻
+
+✅ 6. MongoDB Format
+
+df = spark.read.format("mongodb") \
+    .option("uri", "mongodb://localhost:27017") \
+    .option("database", "salesdb") \
+    .option("collection", "orders") \
+    .option("pipeline", '[{"$match": {"status": "completed"}}]') \
+    .option("readPreference.name", "secondaryPreferred") \
+    .option("partitioner", "MongoSamplePartitioner") \
+    .option("partitionerOptions.partitionKey", "_id") \
+    .option("partitionerOptions.numberOfPartitions", "4") \
+    .option("spark.mongodb.read.schema", '{"order_id":"string","amount":"double"}') \
+    .option("spark.mongodb.read.sampleSize", "1000") \
+    .load()
+
+
+⸻
+
+✅ 7. ORC Format
+
+df = spark.read.format("orc") \
+    .option("mergeSchema", "true") \
+    .option("recursiveFileLookup", "true") \
+    .option("pathGlobFilter", "*.orc") \
+    .option("datetimeRebaseMode", "LEGACY") \
+    .load("s3a://my-bucket/orc-data/")
+
+
+⸻
+
+✅ 8. XML Format (Requires spark-xml)
+
+Maven: "com.databricks:spark-xml_2.12:0.15.0"
+
+df = spark.read.format("xml") \
+    .option("rowTag", "book") \
+    .option("rootTag", "library") \
+    .option("attributePrefix", "_") \
+    .option("valueTag", "_VALUE") \
+    .option("charset", "UTF-8") \
+    .option("ignoreSurroundingSpaces", "true") \
+    .option("excludeAttribute", "false") \
+    .option("mode", "PERMISSIVE") \
+    .option("inferSchema", "true") \
+    .load("s3a://my-bucket/books.xml")
+
+
+⸻
+
+Would you like similar examples for writing to these formats using .write.option() as well?
+
+
+
 Here’s a comprehensive list of all .option() parameters you can specify while reading data files using spark.read.option() in Apache Spark, categorized by data format:
 
 ⸻
