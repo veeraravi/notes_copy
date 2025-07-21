@@ -1,0 +1,161 @@
+Here’s a comprehensive list of all .option() parameters you can specify while reading data files using spark.read.option() in Apache Spark, categorized by data format:
+
+⸻
+
+✅ 1. CSV
+
+spark.read.format("csv").option(...).load("path")
+
+Option	Description
+header	Whether the first line is header (true/false)
+inferSchema	Automatically infer data types (true/false)
+delimiter	Field delimiter (e.g., ,, `
+quote	Quote character (e.g., ")
+escape	Escape character
+multiLine	Support multi-line records (true/false)
+encoding	Character encoding (e.g., UTF-8)
+nullValue	Treat this string as null
+dateFormat	Format for date fields
+timestampFormat	Format for timestamp fields
+mode	PERMISSIVE, DROPMALFORMED, FAILFAST
+comment	Skip lines starting with this character
+ignoreLeadingWhiteSpace / ignoreTrailingWhiteSpace	Ignore white space around fields
+maxCharsPerColumn	Max chars per column
+
+
+⸻
+
+✅ 2. Parquet
+
+spark.read.format("parquet").option(...).load("path")
+
+Option	Description
+mergeSchema	Merge schemas across files (true/false)
+pathGlobFilter	Glob pattern to filter input files
+recursiveFileLookup	Recursively load files from subdirectories
+datetimeRebaseMode	CORRECTED, LEGACY, EXCEPTION
+int96RebaseMode	Same as above, for INT96 timestamps
+
+
+⸻
+
+✅ 3. JSON
+
+spark.read.format("json").option(...).load("path")
+
+Option	Description
+multiLine	If each record spans multiple lines
+primitivesAsString	Infer primitives as string
+allowComments	Allow Java/C++ style comments
+allowUnquotedFieldNames	Allow field names without quotes
+mode	PERMISSIVE, DROPMALFORMED, FAILFAST
+columnNameOfCorruptRecord	Store corrupt records in a column
+encoding	Character encoding (e.g., UTF-8)
+dateFormat	Date format
+timestampFormat	Timestamp format
+dropFieldIfAllNull	Drop fields if all null
+
+
+⸻
+
+✅ 4. Avro
+
+spark.read.format("avro").option(...).load("path")
+
+Option	Description
+avroSchema	Specify custom Avro schema
+recordName	Name of Avro record
+recordNamespace	Namespace of Avro record
+compression	Compression codec for reading/writing
+ignoreExtension	Ignore .avro extension requirement
+mode	Read mode (if malformed)
+
+
+⸻
+
+✅ 5. JDBC (RDBMS)
+
+spark.read.format("jdbc").option(...).load()
+
+Option	Description
+url	JDBC URL (required)
+dbtable or query	Table name or subquery
+user / password	Credentials
+driver	JDBC driver class
+fetchsize	Fetch size (default 1000)
+partitionColumn	Column used for partitioning
+lowerBound / upperBound	Range for partition column
+numPartitions	Number of partitions
+sessionInitStatement	SQL to initialize session
+pushDownPredicate	Enable predicate pushdown
+customSchema	Manually define schema
+isolationLevel	Transaction isolation (e.g., READ_COMMITTED)
+
+
+⸻
+
+✅ 6. MongoDB (with Spark Connector v10+)
+
+spark.read.format("mongodb").option(...).load()
+
+Option	Description
+uri	Full MongoDB connection URI
+database	MongoDB database name
+collection	Collection to read
+pipeline	Aggregation pipeline (JSON array)
+readPreference.name	e.g., primary, secondary
+partitioner	MongoSamplePartitioner, etc.
+partitionerOptions.partitionKey	Field used for partitioning
+partitionerOptions.numberOfPartitions	Number of partitions
+spark.mongodb.read.schema	Specify schema
+spark.mongodb.read.sampleSize	For schema inference
+
+
+⸻
+
+✅ 7. ORC
+
+spark.read.format("orc").option(...).load("path")
+
+Option	Description
+mergeSchema	Merge schemas across ORC files
+recursiveFileLookup	Read all nested files
+pathGlobFilter	Filter files using glob pattern
+datetimeRebaseMode	Same as Parquet (CORRECTED, etc.)
+
+
+⸻
+
+✅ 8. XML (via spark-xml package)
+
+Maven: com.databricks:spark-xml_2.12:0.15.0
+
+spark.read.format("xml").option(...).load("path")
+
+Option	Description
+rowTag	Name of the tag that represents a row (required)
+rootTag	Optional wrapper tag for the whole document
+attributePrefix	Prefix for attributes (default: _)
+valueTag	Name of tag containing value (default: _VALUE)
+charset	Encoding (e.g., UTF-8)
+ignoreSurroundingSpaces	Trim spaces
+excludeAttribute	Ignore attributes
+mode	PERMISSIVE, FAILFAST, DROPMALFORMED
+inferSchema	Automatically infer data types
+rowValidationXSDPath	Validate against XSD schema
+
+
+⸻
+
+🔄 Common Options (Apply to All File Formats)
+
+Option	Description
+pathGlobFilter	Glob pattern to filter input files
+recursiveFileLookup	Enable recursive directory scan
+modifiedBefore / modifiedAfter	Read files modified before/after timestamps
+basePath	Base directory for partition discovery
+
+
+⸻
+
+Would you like the write options for each format too?
