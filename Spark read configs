@@ -1,3 +1,226 @@
+To read an XML file in Scala using Spark, you need to use the spark-xml library from Databricks. Here’s how you can do it step by step, including:
+	•	Maven dependency
+	•	XML file structure
+	•	Scala code with .option() settings
+
+⸻
+
+✅ 1. Add spark-xml Dependency
+
+If using sbt:
+
+libraryDependencies += "com.databricks" %% "spark-xml" % "0.15.0"
+
+Or in spark-submit:
+
+--packages com.databricks:spark-xml_2.12:0.15.0
+
+
+⸻
+
+✅ 2. Sample XML File
+
+Assume you have an XML file like this:
+
+<books>
+  <book>
+    <id>1</id>
+    <title>Scala Programming</title>
+    <author>Martin Odersky</author>
+  </book>
+  <book>
+    <id>2</id>
+    <title>Spark Essentials</title>
+    <author>Holden Karau</author>
+  </book>
+</books>
+
+Save this as books.xml in HDFS, S3, or local file system.
+
+⸻
+
+✅ 3. Scala Spark Code to Read XML
+
+import org.apache.spark.sql.SparkSession
+
+val spark = SparkSession.builder()
+  .appName("Read XML")
+  .master("local[*]")
+  .getOrCreate()
+
+val df = spark.read
+  .format("xml")
+  .option("rowTag", "book")          // Required: denotes the repeating tag
+  .option("rootTag", "books")        // Optional: root element
+  .option("inferSchema", "true")     // Infer data types
+  .option("charset", "UTF-8")        // Character encoding
+  .load("path/to/books.xml")
+
+df.show()
+
+
+⸻
+
+✅ 4. Output
+
++---+------------------+-------------------+
+| id|             title|             author|
++---+------------------+-------------------+
+|  1|  Scala Programming|  Martin Odersky  |
+|  2|   Spark Essentials|    Holden Karau  |
++---+------------------+-------------------+
+
+
+⸻
+
+✅ 5. Other Common .option() Settings for XML
+
+Option	Description
+rowTag	The XML tag that identifies each row (e.g., book)
+rootTag	Optional outer wrapper tag
+attributePrefix	Prefix for attributes (default: _)
+valueTag	Tag name for element text (default: _VALUE)
+mode	PERMISSIVE, FAILFAST, DROPMALFORMED
+ignoreSurroundingSpaces	Trims whitespace
+excludeAttribute	Whether to ignore XML attributes
+rowValidationXSDPath	Path to XSD schema for validation
+
+
+⸻
+
+Would you like an example of reading nested or attribute-based XML as well?
+
+
+
+Great! Let’s break this down clearly.
+
+⸻
+
+✅ Mandatory Option When Reading XML in Spark
+
+✔️ rowTag is mandatory
+	•	It tells Spark which XML tag should be treated as a single row (record).
+	•	Without rowTag, Spark will throw an error like:
+❗ Please set the rowTag option.
+
+⸻
+
+✅ Optional but Useful Options
+
+Option	Required	Description
+rowTag	✅ Yes	XML tag that defines each record (e.g., book)
+inferSchema	❌ No	Automatically infers schema (true/false)
+rootTag	❌ No	Top-level wrapper tag (useful for writing back XML)
+attributePrefix	❌ No	Prefix used for attributes (_ by default)
+valueTag	❌ No	Tag used for element text (_VALUE by default)
+excludeAttribute	❌ No	If true, ignores all attributes
+ignoreSurroundingSpaces	❌ No	Trims leading/trailing spaces
+mode	❌ No	PERMISSIVE (default), FAILFAST, DROPMALFORMED
+
+
+⸻
+
+📘 Example 1: Reading Nested XML with Attributes
+
+🔸 Sample XML (orders.xml):
+
+<orders>
+  <order id="101" status="shipped">
+    <customer>John Doe</customer>
+    <items>
+      <item>
+        <name>Laptop</name>
+        <price>1200</price>
+      </item>
+      <item>
+        <name>Mouse</name>
+        <price>25</price>
+      </item>
+    </items>
+  </order>
+</orders>
+
+
+⸻
+
+🔸 Scala Code:
+
+val df = spark.read
+  .format("xml")
+  .option("rowTag", "order")
+  .option("inferSchema", "true")
+  .option("attributePrefix", "_")  // attribute 'id' becomes '_id'
+  .option("valueTag", "_VALUE")
+  .load("path/to/orders.xml")
+
+df.printSchema()
+df.show(truncate = false)
+
+
+⸻
+
+🔸 Output:
+
+root
+ |-- _id: long (nullable = true)
+ |-- _status: string (nullable = true)
+ |-- customer: string (nullable = true)
+ |-- items: struct (nullable = true)
+ |    |-- item: array (nullable = true)
+ |    |    |-- element: struct
+ |    |    |    |-- name: string
+ |    |    |    |-- price: double
+
+
+⸻
+
+📘 Example 2: Flat XML Without Attributes
+
+🔸 XML:
+
+<employees>
+  <employee>
+    <name>Alice</name>
+    <dept>HR</dept>
+  </employee>
+  <employee>
+    <name>Bob</name>
+    <dept>IT</dept>
+  </employee>
+</employees>
+
+🔸 Scala Code:
+
+val df = spark.read
+  .format("xml")
+  .option("rowTag", "employee")   // required
+  .option("inferSchema", "true")
+  .load("path/to/employees.xml")
+
+df.show()
+
+
+⸻
+
+✅ Summary
+
+Scenario	Required Option	Notes
+Basic XML	rowTag	Without this Spark fails
+With attributes	attributePrefix	Defaults to _
+Nested elements	Handled automatically	Results in structs/arrays
+Flat XML	Only rowTag needed	Infer schema if needed
+
+
+⸻
+
+Let me know if you’d like to write XML files as well (df.write.format("xml")), or validate against an XSD schema.
+
+
+
+
+
+
+
 Below are code examples for using .option() with spark.read for each supported format in Apache Spark:
 
 ⸻
